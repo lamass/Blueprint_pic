@@ -1,0 +1,619 @@
+<title>Order Flow Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --surface-0:#f2f1ec;
+    --surface-1:#fcfcfb;
+    --surface-2:#eeece5;
+    --text-primary:#0b0b0b;
+    --text-secondary:#52514e;
+    --text-muted:#898781;
+    --hairline:#e1e0d9;
+    --accent:#2a78d6;
+    --accent-wash:rgba(42,120,214,0.10);
+    --critical:#d03b3b;
+    --critical-wash:rgba(208,59,59,0.10);
+    --sma9:#eb6834;
+    --sma21:#1baf7a;
+    --sma100:#eda100;
+    --chart-bg: 15,15,15;
+    --shadow: 0 1px 2px rgba(11,11,11,0.06), 0 8px 24px rgba(11,11,11,0.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --surface-0:#0d0e0f;
+      --surface-1:#15171a;
+      --surface-2:#1c1f23;
+      --text-primary:#eeece6;
+      --text-secondary:#a6a39b;
+      --text-muted:#716e67;
+      --hairline:#2a2d30;
+      --accent:#3987e5;
+      --accent-wash:rgba(57,135,229,0.14);
+      --critical:#e66767;
+      --critical-wash:rgba(230,103,103,0.14);
+      --sma9:#d95926;
+      --sma21:#199e70;
+      --sma100:#c98500;
+      --chart-bg: 8,8,9;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --surface-0:#0d0e0f;
+    --surface-1:#15171a;
+    --surface-2:#1c1f23;
+    --text-primary:#eeece6;
+    --text-secondary:#a6a39b;
+    --text-muted:#716e67;
+    --hairline:#2a2d30;
+    --accent:#3987e5;
+    --accent-wash:rgba(57,135,229,0.14);
+    --critical:#e66767;
+    --critical-wash:rgba(230,103,103,0.14);
+    --sma9:#d95926;
+    --sma21:#199e70;
+    --sma100:#c98500;
+    --chart-bg: 8,8,9;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  *{box-sizing:border-box;}
+  body{background:var(--surface-0); color:var(--text-primary); font-family:'IBM Plex Mono', ui-monospace, monospace;}
+  .wrap{max-width:1280px; margin:0 auto; padding:28px 20px 40px; display:flex; flex-direction:column; gap:16px;}
+  .header{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; border-bottom:1px solid var(--hairline); padding-bottom:16px;}
+  .ticker{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;}
+  .ticker h1{font-family:'Archivo', system-ui, sans-serif; font-weight:800; font-size:32px; letter-spacing:-0.01em; margin:0; text-wrap:balance;}
+  .ticker .sub{width:100%; font-size:12.5px; color:var(--text-muted); margin-top:2px; max-width:90ch;}
+  .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--hairline); border:1px solid var(--hairline); border-radius:10px; overflow:hidden;}
+  .tile{background:var(--surface-1); padding:12px 16px; display:flex; flex-direction:column; gap:4px;}
+  .tile .label{font-family:'Archivo', system-ui, sans-serif; font-size:10.5px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted);}
+  .tile .value{font-size:19px; font-weight:500; font-variant-numeric:tabular-nums;}
+  .tile .foot{font-size:11px; color:var(--text-secondary); font-variant-numeric:tabular-nums;}
+  .card{background:var(--surface-1); border:1px solid var(--hairline); border-radius:10px; box-shadow:var(--shadow); padding:14px 16px 12px;}
+  .card-head{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:8px;}
+  .card-title{font-family:'Archivo', system-ui, sans-serif; font-weight:700; font-size:14px;}
+  .controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:11.5px; color:var(--text-secondary);}
+  .btn{font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:500; color:var(--text-secondary); background:var(--surface-1); border:1px solid var(--hairline); border-radius:7px; padding:6px 11px; cursor:pointer;}
+  .btn:hover{color:var(--text-primary); border-color:var(--text-muted);}
+  .btn[aria-pressed="true"]{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .legend{display:flex; align-items:center; gap:14px; font-size:11px; color:var(--text-secondary); flex-wrap:wrap;}
+  .legend .sw{display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px;}
+  .chart-shell{position:relative; border:1px solid var(--hairline); border-radius:7px; background:rgb(var(--chart-bg)); cursor:crosshair; overflow:hidden;}
+  canvas#chart{display:block; width:100%;}
+  .readout{position:absolute; top:10px; left:12px; display:flex; gap:12px; flex-wrap:wrap; font-size:11.5px; background:rgba(20,20,22,0.94); color:#eee; border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:7px 11px; pointer-events:none; opacity:0; transition:opacity 0.1s; max-width:92%;}
+  .readout.show{opacity:1;}
+  .readout b{font-weight:600; color:#fff;}
+  .readout .ro-item{display:flex; gap:5px; color:#aaa; white-space:nowrap;}
+  .readout .ro-item.hl{color:#ff9d9d;}
+  .methodology{font-size:11px; color:var(--text-muted); margin:0; max-width:92ch; line-height:1.6;}
+  .methodology-fold{background:var(--surface-1); border:1px solid var(--hairline); border-radius:10px; box-shadow:var(--shadow); padding:10px 16px;}
+  .methodology-fold summary{cursor:pointer; list-style:none; font-family:'Archivo', system-ui, sans-serif; font-weight:700; font-size:13px; color:var(--text-secondary);}
+  .methodology-fold summary::-webkit-details-marker{display:none;}
+  .methodology-fold summary::before{content:"\25B8 "; display:inline-block;}
+  .methodology-fold[open] summary::before{content:"\25BE ";}
+  .methodology-fold .methodology{margin-top:10px;}
+  .methodology-fold ol{padding-left:18px; margin:8px 0 0;}
+  .footer{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; font-size:11px; color:var(--text-muted); padding-top:4px;}
+  @media (max-width:640px){.tiles{grid-template-columns:repeat(2,1fr);} .ticker h1{font-size:24px;}}
+</style>
+
+<div class="wrap">
+  <div class="header">
+    <div class="ticker">
+      <h1>Order Flow Desk</h1>
+      <span class="sub">NQ 09-26 &middot; ticks grouped into equal-<b>volume</b> buckets (not equal-time), each scored for buy/sell imbalance via Bulk Volume Classification (BVC). Extreme-imbalance buckets are highlighted so you can see what price actually did right after.</span>
+    </div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile">
+      <span class="label">Bucket size</span>
+      <span class="value" id="tileBucketSize">&mdash;</span>
+      <span class="foot">contracts / bucket, ~50/day</span>
+    </div>
+    <div class="tile">
+      <span class="label">Extreme VPIN threshold</span>
+      <span class="value" id="tileThreshold">&mdash;</span>
+      <span class="foot">top decile of readings</span>
+    </div>
+    <div class="tile">
+      <span class="label">Buckets in view</span>
+      <span class="value" id="tileBucketsInView">&mdash;</span>
+      <span class="foot" id="tileViewSpan">&mdash;</span>
+    </div>
+    <div class="tile">
+      <span class="label">Extreme buckets in view</span>
+      <span class="value" id="tileExtremeInView">&mdash;</span>
+      <span class="foot">red bands below</span>
+    </div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile">
+      <span class="label">Signals (SMA9 stop-and-reverse)</span>
+      <span class="value" id="tileTradeCount">&mdash;</span>
+      <span class="foot">flips position if price re-crosses SMA9</span>
+    </div>
+    <div class="tile">
+      <span class="label">Win rate</span>
+      <span class="value" id="tileWinRate">&mdash;</span>
+      <span class="foot">of trades taken, whole dataset</span>
+    </div>
+    <div class="tile">
+      <span class="label">Total P&amp;L</span>
+      <span class="value" id="tileTotalPnl">&mdash;</span>
+      <span class="foot">NQ points, sum of all trades</span>
+    </div>
+    <div class="tile">
+      <span class="label">Avg P&amp;L / trade</span>
+      <span class="value" id="tileAvgPnl">&mdash;</span>
+      <span class="foot" id="tileSmallSample">small sample &mdash; interpret cautiously</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Price &middot; bucket duration &middot; VPIN (BVC)</span>
+      <div class="controls">
+        <button class="btn" id="btnZoomOut">&minus; zoom out</button>
+        <button class="btn" id="btnZoomIn">+ zoom in</button>
+        <button class="btn" id="btnPrevTrade">&lsaquo; prev trade</button>
+        <button class="btn" id="btnNextTrade">next trade &rsaquo;</button>
+        <button class="btn" id="btnReset">Reset view</button>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--accent);"></span>Price (bucket-close)</span>
+      <span><span class="sw" style="background:var(--sma9);"></span>SMA 9</span>
+      <span><span class="sw" style="background:var(--sma21);"></span>SMA 21</span>
+      <span><span class="sw" style="background:var(--sma100);"></span>SMA 100</span>
+      <span><span class="sw" style="background:var(--text-muted);"></span>Bucket duration</span>
+      <span><span class="sw" style="background:var(--accent);"></span>VPIN (BVC)</span>
+      <span><span class="sw" style="background:var(--critical);"></span>Extreme VPIN bucket</span>
+      <span>&#9650; green = long entry &middot; &#9660; red = short entry &middot; &#9679; gray = exit &middot; a triangle sitting right on a dot = mid-trade flip</span>
+      <span style="color:var(--text-muted);">drag to pan &middot; scroll to zoom &middot; hover for detail</span>
+    </div>
+    <div class="controls" style="margin-bottom:10px;">
+      <span style="color:var(--text-secondary);">Additional filter on top of the SMA9 long/short rule:</span>
+      <button class="btn" id="filterAll" aria-pressed="true">All 19 trades</button>
+      <button class="btn" id="filterSma21">Also require price &gt; SMA21</button>
+      <button class="btn" id="filterSma100">Also require price &gt; SMA100</button>
+      <span id="filterNote" style="color:var(--text-muted); font-size:11px;"></span>
+    </div>
+    <div class="chart-shell" id="chartShell">
+      <canvas id="chart"></canvas>
+      <div class="readout" id="readout"></div>
+    </div>
+  </div>
+
+  <details class="methodology-fold">
+    <summary>How this chart is built &mdash; read this if the "volume bucket" idea is new</summary>
+    <div class="methodology">
+      <ol>
+        <li><b>Bucketing by volume, not time.</b> A normal candle chart draws one bar per minute regardless of how much traded. Here, a new bucket starts only once ~7,280 contracts have traded (auto-sized to ~50 buckets/day) &mdash; so a bucket during a fast, busy stretch closes in seconds, and a bucket during a quiet stretch can take many minutes. The gray "bucket duration" strip in the middle panel makes this directly visible: short bars = fast/active buckets, tall bars = slow/quiet ones.</li>
+        <li><b>Scoring each bucket's buy/sell imbalance (BVC).</b> Instead of trying to label every individual trade as a "buy" or "sell", Bulk Volume Classification looks at how much the price moved across the whole bucket, standardizes that move, and splits the bucket's volume fractionally between buy/sell using the normal distribution &mdash; a bucket where price jumped up is treated as mostly-buy volume, one where price barely moved as roughly 50/50.</li>
+        <li><b>Rolling that into VPIN.</b> VPIN is the average order imbalance over the last 50 buckets, as a fraction of bucket size &mdash; a single number from 0 (perfectly balanced flow) to 1 (completely one-sided). The dashed line on the bottom panel marks the top-decile threshold; buckets at or above it are colored red as "extreme".</li>
+        <li><b>Did it matter?</b> For every extreme bucket, forward returns/volatility at 5, 15, and 30 minutes were compared against normal buckets. Hover any extreme (red) region to see that specific bucket's actual forward returns.</li>
+        <li><b>Turning it into trades.</b> Entry = the first bucket a fresh VPIN crossing goes extreme. Direction is set by the 9-bucket SMA at that moment: price above SMA9 &rarr; <b style="color:#0ca30c">long</b>, price below &rarr; <b style="color:#d03b3b">short</b>. <b>Mid-trade conversion:</b> if price crosses back to the other side of SMA9 before the 30-minute hold is up, the position exits right there and immediately flips (short&rarr;long or long&rarr;short), and that new leg gets its own fresh 30-minute hold. If price never re-crosses, it's a single leg, same as before.</li>
+        <li><b>Why SMA9 for direction, not the bucket's own buy/sell imbalance?</b> That was tried first: buy-dominant and sell-dominant extreme buckets both showed positive forward drift, so the imbalance sign alone doesn't predict direction. Short-term trend (SMA9) does better.</li>
+        <li><b>Be skeptical of this specific rule's results.</b> Three versions of this strategy have now been tested on the exact same 19 signal events, each refined after seeing how the previous one scored: long-only (+268pt), SMA9-directional (+520pt), now SMA9 stop-and-reverse (+1176pt, 89% win rate). A result that keeps climbing every time the rule is tweaked on the same small sample is the classic signature of curve-fitting to history, not a growing real edge &mdash; each version fits this specific 3-month window a little better, which says nothing about live performance. Treat this version as a hypothesis to test on fresh data (a different contract, or ES), not a validated strategy.</li>
+      </ol>
+    </div>
+  </details>
+
+  <div class="footer">
+    <span>Source: NinjaTrader TickRecorder.cs -> Postgres -> vpin_event_study.py (BVC method) &middot; 28.7M ticks, 2026-06-21 to 2026-09-15</span>
+    <span id="footGenerated"></span>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const DATA = __VPIN_DATA__;
+  const LEGS = __LEGS_DATA__;
+  const SIGNALS = __SIGNALS_DATA__;
+  const THRESHOLD = __VPIN_THRESHOLD__;
+  const BUCKET_SIZE = __BUCKET_SIZE__;
+  const EXAMPLE_INDEX = __EXAMPLE_INDEX__;
+
+  document.getElementById('tileBucketSize').textContent = BUCKET_SIZE.toLocaleString();
+  document.getElementById('tileThreshold').textContent = THRESHOLD.toFixed(3);
+  document.getElementById('footGenerated').textContent = 'Chart built ' + new Date().toISOString().slice(0,16).replace('T',' ') + ' UTC';
+
+  let activeFilter = null; // null = all, else 'aboveSma21' | 'aboveSma100'
+  function currentSignals(){
+    return activeFilter ? SIGNALS.filter(s => s[activeFilter]) : SIGNALS;
+  }
+  function currentLegs(){
+    const ids = new Set(currentSignals().map(s => s.id));
+    return LEGS.filter(l => ids.has(l.signalId));
+  }
+  function updateStatTiles(){
+    const signals = currentSignals();
+    const wins = signals.filter(s => s.totalPnl > 0).length;
+    const total = signals.reduce((s,x) => s+x.totalPnl, 0);
+    const converted = signals.filter(s => s.converted).length;
+    document.getElementById('tileTradeCount').textContent = signals.length;
+    document.getElementById('tileWinRate').textContent = signals.length ? (100*wins/signals.length).toFixed(0)+'%' : '\u2014';
+    document.getElementById('tileTotalPnl').textContent = (total>=0?'+':'') + total.toFixed(1) + ' pts';
+    document.getElementById('tileAvgPnl').textContent = signals.length ? ((total/signals.length>=0?'+':'') + (total/signals.length).toFixed(1) + ' pts') : '\u2014';
+    document.getElementById('filterNote').textContent = (activeFilter ? ('showing '+signals.length+' of '+SIGNALS.length+' signals, ') : '') + converted + ' of '+signals.length+' converted mid-trade (SMA9 flip)';
+  }
+  updateStatTiles();
+
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const shell = document.getElementById('chartShell');
+  const readout = document.getElementById('readout');
+
+  const N = DATA.length;
+  let visibleTradeMarkers = [];
+  let viewStart = Math.max(0, EXAMPLE_INDEX - 90);
+  let viewEnd = Math.min(N - 1, EXAMPLE_INDEX + 90);
+
+  function isDark(){
+    const stamp = document.documentElement.getAttribute('data-theme');
+    if (stamp === 'dark') return true;
+    if (stamp === 'light') return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function cssVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  let W = 0, H = 0, DPR = 1;
+  function resize(){
+    DPR = window.devicePixelRatio || 1;
+    W = shell.clientWidth;
+    H = 560;
+    canvas.style.height = H + 'px';
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    draw();
+  }
+
+  const PANEL = {
+    price:    {top: 20,  height: 300},
+    duration: {top: 330, height: 70},
+    vpin:     {top: 415, height: 120}
+  };
+  function xForIndex(i){
+    const n = viewEnd - viewStart;
+    return 66 + ( (i - viewStart) / Math.max(1,n) ) * (W - 66 - 14);
+  }
+  function indexForX(x){
+    const n = viewEnd - viewStart;
+    const frac = (x - 66) / (W - 66 - 14);
+    return Math.round(viewStart + frac * n);
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    const dark = isDark();
+    const ink = dark ? '#eeece6' : '#0b0b0b';
+    const muted = '#898781';
+    const hair = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.08)';
+    const accent = dark ? '#3987e5' : '#2a78d6';
+    const critical = dark ? '#e66767' : '#d03b3b';
+    const criticalWash = dark ? 'rgba(230,103,103,0.16)' : 'rgba(208,59,59,0.16)';
+
+    const slice = DATA.slice(viewStart, viewEnd+1);
+    if (slice.length < 2) return;
+
+    // ---- extreme-bucket highlight bands (span all panels) ----
+    for (let i = viewStart; i <= viewEnd; i++){
+      const d = DATA[i];
+      if (d.vpinBvc !== null && d.vpinBvc >= THRESHOLD){
+        const x0 = xForIndex(i - 0.5), x1 = xForIndex(i + 0.5);
+        ctx.fillStyle = criticalWash;
+        ctx.fillRect(x0, PANEL.price.top, Math.max(1, x1-x0), PANEL.vpin.top + PANEL.vpin.height - PANEL.price.top);
+      }
+    }
+
+    // ---- price panel ----
+    const prices = slice.map(d => d.p);
+    const pMin = Math.min(...prices), pMax = Math.max(...prices);
+    const pPad = (pMax - pMin) * 0.08 || 1;
+    const yForPrice = (p) => PANEL.price.top + PANEL.price.height * (1 - (p - (pMin-pPad)) / ((pMax+pPad)-(pMin-pPad)));
+
+    ctx.strokeStyle = hair === 'rgba(255,255,255,0.08)' ? (dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.10)') : hair;
+    ctx.lineWidth = 1;
+    for (let gy = 0; gy <= 4; gy++){
+      const y = PANEL.price.top + (PANEL.price.height/4)*gy;
+      ctx.beginPath(); ctx.moveTo(66, y); ctx.lineTo(W-14, y); ctx.stroke();
+    }
+    ctx.fillStyle = muted; ctx.font = '10.5px "IBM Plex Mono", monospace'; ctx.textAlign = 'right';
+    for (let gy = 0; gy <= 4; gy++){
+      const y = PANEL.price.top + (PANEL.price.height/4)*gy;
+      const val = (pMax+pPad) - ((pMax+pPad)-(pMin-pPad)) * (gy/4);
+      ctx.fillText(val.toFixed(1), 60, y+3);
+    }
+
+    // ---- SMA lines (drawn behind the price line) ----
+    const smaColors = {sma9: cssVar('--sma9'), sma21: cssVar('--sma21'), sma100: cssVar('--sma100')};
+    ['sma9','sma21','sma100'].forEach(key => {
+      ctx.beginPath();
+      ctx.strokeStyle = smaColors[key]; ctx.lineWidth = 1.3;
+      let started = false;
+      slice.forEach((d,idx) => {
+        if (d[key] === null) return;
+        const x = xForIndex(viewStart+idx), y = yForPrice(d[key]);
+        if (!started){ ctx.moveTo(x,y); started = true; } else ctx.lineTo(x,y);
+      });
+      if (started) ctx.stroke();
+    });
+
+    ctx.beginPath();
+    ctx.strokeStyle = accent; ctx.lineWidth = 1.8;
+    slice.forEach((d,idx) => {
+      const x = xForIndex(viewStart+idx), y = yForPrice(d.p);
+      if (idx===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    ctx.fillStyle = ink; ctx.font = '600 11px Archivo, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('PRICE', 66, PANEL.price.top - 6);
+
+    // ---- trade markers: green up-triangle = long entry, red down-triangle = short entry, gray dot = exit ----
+    const good = '#0ca30c', bad = '#d03b3b', exitColor = dark ? '#c3c2b7' : '#716e67';
+    visibleTradeMarkers = [];
+    currentLegs().forEach(t => {
+      const entryVisible = t.entryIdx >= viewStart && t.entryIdx <= viewEnd;
+      const exitVisible = t.exitIdx >= viewStart && t.exitIdx <= viewEnd;
+      if (!entryVisible && !exitVisible) return;
+
+      const ex = xForIndex(t.entryIdx), ey = yForPrice(t.entryP);
+      const xx = xForIndex(t.exitIdx), xy = yForPrice(t.exitP);
+      const isLong = t.direction === 'long';
+
+      ctx.setLineDash([3,3]);
+      ctx.strokeStyle = t.pnl >= 0 ? good : bad;
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(xx,xy); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+      if (entryVisible){
+        ctx.fillStyle = isLong ? good : bad;
+        ctx.beginPath();
+        if (isLong){
+          ctx.moveTo(ex, ey-9); ctx.lineTo(ex-6, ey+2); ctx.lineTo(ex+6, ey+2);
+        } else {
+          ctx.moveTo(ex, ey+9); ctx.lineTo(ex-6, ey-2); ctx.lineTo(ex+6, ey-2);
+        }
+        ctx.closePath();
+        ctx.fill();
+        visibleTradeMarkers.push({x:ex, y:ey+(isLong?-3:3), trade:t, kind:'entry'});
+      }
+      if (exitVisible){
+        ctx.fillStyle = exitColor;
+        ctx.beginPath(); ctx.arc(xx, xy, 4, 0, Math.PI*2); ctx.fill();
+        visibleTradeMarkers.push({x:xx, y:xy, trade:t, kind:'exit'});
+      }
+    });
+
+    // ---- bucket duration panel ----
+    const durations = [];
+    for (let i = viewStart; i <= viewEnd; i++){
+      const prevT = i>0 ? DATA[i-1].t : DATA[i].t;
+      durations.push(Math.max(1,(DATA[i].t - prevT)/1000));
+    }
+    const dMax = Math.max(...durations, 1);
+    const barW = Math.max(1, (W-66-14)/(viewEnd-viewStart+1) - 1);
+    ctx.fillStyle = ink; ctx.font = '600 11px Archivo, sans-serif';
+    ctx.fillText('BUCKET DURATION (sec, log)', 66, PANEL.duration.top - 6);
+    durations.forEach((sec, idx) => {
+      const i = viewStart+idx;
+      const x = xForIndex(i) - barW/2;
+      const frac = Math.log(sec+1)/Math.log(dMax+1);
+      const h = Math.max(1, frac * PANEL.duration.height);
+      const isExtreme = DATA[i].vpinBvc !== null && DATA[i].vpinBvc >= THRESHOLD;
+      ctx.fillStyle = isExtreme ? critical : muted;
+      ctx.globalAlpha = isExtreme ? 0.9 : 0.55;
+      ctx.fillRect(x, PANEL.duration.top + PANEL.duration.height - h, barW, h);
+    });
+    ctx.globalAlpha = 1;
+
+    // ---- VPIN panel ----
+    ctx.fillStyle = ink; ctx.font = '600 11px Archivo, sans-serif';
+    ctx.fillText('VPIN (BVC)', 66, PANEL.vpin.top - 6);
+    const yForVpin = (v) => PANEL.vpin.top + PANEL.vpin.height * (1 - v);
+
+    ctx.strokeStyle = dark ? 'rgba(255,255,255,0.08)' : 'rgba(11,11,11,0.06)';
+    [0, 0.5, 1].forEach(v => {
+      const y = yForVpin(v);
+      ctx.beginPath(); ctx.moveTo(66,y); ctx.lineTo(W-14,y); ctx.stroke();
+    });
+    ctx.fillStyle = muted; ctx.font = '10.5px "IBM Plex Mono", monospace'; ctx.textAlign='right';
+    [0, 0.5, 1].forEach(v => ctx.fillText(v.toFixed(1), 60, yForVpin(v)+3));
+
+    // threshold dashed line
+    ctx.save();
+    ctx.setLineDash([4,3]);
+    ctx.strokeStyle = critical; ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    const ty = yForVpin(THRESHOLD);
+    ctx.moveTo(66, ty); ctx.lineTo(W-14, ty);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = critical; ctx.font = '10px "IBM Plex Mono", monospace'; ctx.textAlign='left';
+    ctx.fillText('extreme threshold ' + THRESHOLD.toFixed(3), 70, ty - 4);
+
+    ctx.beginPath();
+    ctx.strokeStyle = accent; ctx.lineWidth = 1.6;
+    let started = false;
+    slice.forEach((d,idx) => {
+      if (d.vpinBvc === null) return;
+      const x = xForIndex(viewStart+idx), y = yForVpin(d.vpinBvc);
+      if (!started){ ctx.moveTo(x,y); started = true; } else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    // extreme markers
+    slice.forEach((d,idx) => {
+      if (d.vpinBvc !== null && d.vpinBvc >= THRESHOLD){
+        const x = xForIndex(viewStart+idx), y = yForVpin(d.vpinBvc);
+        ctx.fillStyle = critical;
+        ctx.beginPath(); ctx.arc(x,y,2.6,0,Math.PI*2); ctx.fill();
+      }
+    });
+
+    // x-axis time labels
+    ctx.fillStyle = muted; ctx.font = '10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+    const labelCount = 6;
+    for (let k=0;k<=labelCount;k++){
+      const i = Math.round(viewStart + (viewEnd-viewStart)*(k/labelCount));
+      const d = DATA[Math.min(N-1,Math.max(0,i))];
+      const dt = new Date(d.t);
+      const label = dt.toISOString().slice(5,16).replace('T',' ');
+      ctx.fillText(label, xForIndex(i), PANEL.vpin.top + PANEL.vpin.height + 16);
+    }
+
+    // update tiles
+    let extremeCount = 0;
+    for (let i=viewStart;i<=viewEnd;i++) if (DATA[i].vpinBvc!==null && DATA[i].vpinBvc>=THRESHOLD) extremeCount++;
+    document.getElementById('tileBucketsInView').textContent = (viewEnd-viewStart+1).toLocaleString();
+    document.getElementById('tileExtremeInView').textContent = extremeCount;
+    const t0 = new Date(DATA[viewStart].t), t1 = new Date(DATA[viewEnd].t);
+    document.getElementById('tileViewSpan').textContent = t0.toISOString().slice(0,10) + ' -> ' + t1.toISOString().slice(0,10);
+  }
+
+  // ---- interaction: drag to pan, wheel to zoom, hover readout ----
+  let dragging = false, dragStartX = 0, dragStartView = [0,0];
+  canvas.addEventListener('mousedown', (e) => {
+    dragging = true;
+    dragStartX = e.clientX;
+    dragStartView = [viewStart, viewEnd];
+    canvas.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mouseup', () => { dragging = false; canvas.style.cursor='crosshair'; });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const dxPx = e.clientX - dragStartX;
+    const n = dragStartView[1]-dragStartView[0];
+    const dIdx = Math.round(-dxPx / ((W-66-14)/Math.max(1,n)));
+    let ns = dragStartView[0] + dIdx, ne = dragStartView[1] + dIdx;
+    if (ns < 0){ ne -= ns; ns = 0; }
+    if (ne > N-1){ ns -= (ne-(N-1)); ne = N-1; }
+    ns = Math.max(0,ns);
+    viewStart = ns; viewEnd = ne;
+    draw();
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const centerIdx = indexForX(mouseX);
+    const n = viewEnd - viewStart;
+    const factor = e.deltaY > 0 ? 1.15 : 0.87;
+    let newN = Math.max(20, Math.min(N-1, Math.round(n*factor)));
+    let ns = Math.round(centerIdx - (centerIdx-viewStart)*(newN/n));
+    let ne = ns + newN;
+    if (ns<0){ ne -= ns; ns = 0; }
+    if (ne>N-1){ ns -= (ne-(N-1)); ne = N-1; }
+    viewStart = Math.max(0,ns); viewEnd = Math.min(N-1,ne);
+    draw();
+  }, {passive:false});
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+
+    // trade markers take priority when the cursor is right on one
+    let nearest = null, nearestD2 = 11*11;
+    visibleTradeMarkers.forEach(m => {
+      const d2 = (m.x-x)*(m.x-x) + (m.y-y)*(m.y-y);
+      if (d2 < nearestD2){ nearestD2 = d2; nearest = m; }
+    });
+    if (nearest){
+      const t = nearest.trade;
+      const signal = SIGNALS.find(s => s.id === t.signalId);
+      const allLegs = LEGS.filter(l => l.signalId === t.signalId);
+      const win = signal.totalPnl >= 0;
+      let html = '<span class="ro-item"><b>SIGNAL #'+(signal.id+1)+' '+(signal.converted?'(converted)':'')+' '+(win?'(net win)':'(net loss)')+'</b></span>';
+      allLegs.forEach((l,i) => {
+        html += '<span class="ro-item">'+(i>0?'\u2192 converted to ':'')+l.direction.toUpperCase()+' '+
+          new Date(l.entryT).toISOString().slice(0,16).replace('T',' ')+' @ '+l.entryP.toFixed(2)+
+          ' \u2192 '+new Date(l.exitT).toISOString().slice(0,16).replace('T',' ')+' @ '+l.exitP.toFixed(2)+
+          ' <b'+(l.pnl<0?' class="hl"':'')+'>('+(l.pnl>=0?'+':'')+l.pnl.toFixed(2)+')</b></span>';
+      });
+      html += '<span class="ro-item'+(win?'':' hl')+'">TOTAL P&amp;L <b>'+(signal.totalPnl>=0?'+':'')+signal.totalPnl.toFixed(2)+' pts</b></span>';
+      html += '<span class="ro-item">triggered at VPIN(BVC) <b>'+t.vpin.toFixed(4)+'</b></span>';
+      readout.innerHTML = html;
+      readout.classList.add('show');
+      return;
+    }
+
+    const i = Math.min(N-1, Math.max(0, indexForX(x)));
+    const d = DATA[i];
+    if (!d) { readout.classList.remove('show'); return; }
+    const isExtreme = d.vpinBvc !== null && d.vpinBvc >= THRESHOLD;
+    const dt = new Date(d.t);
+    const fmtPct = (v) => v===null ? '&mdash;' : (v*100).toFixed(3)+'%';
+    readout.innerHTML =
+      '<span class="ro-item"><b>'+dt.toISOString().slice(0,19).replace('T',' ')+' UTC</b></span>' +
+      '<span class="ro-item">price <b>'+d.p.toFixed(2)+'</b></span>' +
+      '<span class="ro-item">volume <b>'+d.vol.toLocaleString()+'</b></span>' +
+      '<span class="ro-item">buy/sell(BVC) <b>'+Math.round(d.buy).toLocaleString()+' / '+Math.round(d.sell).toLocaleString()+'</b></span>' +
+      '<span class="ro-item'+(isExtreme?' hl':'')+'">VPIN(BVC) <b>'+(d.vpinBvc!==null?d.vpinBvc.toFixed(4):'&mdash;')+'</b>'+(isExtreme?' EXTREME':'')+'</span>' +
+      '<span class="ro-item">fwd ret 5m/15m/30m <b>'+fmtPct(d.ret5)+' / '+fmtPct(d.ret15)+' / '+fmtPct(d.ret30)+'</b></span>';
+    readout.classList.add('show');
+  });
+  canvas.addEventListener('mouseleave', () => readout.classList.remove('show'));
+
+  document.getElementById('btnZoomIn').addEventListener('click', () => {
+    const n = viewEnd-viewStart, mid=(viewStart+viewEnd)/2, newN = Math.max(20, Math.round(n*0.6));
+    viewStart = Math.max(0, Math.round(mid-newN/2)); viewEnd = Math.min(N-1, viewStart+newN); draw();
+  });
+  document.getElementById('btnZoomOut').addEventListener('click', () => {
+    const n = viewEnd-viewStart, mid=(viewStart+viewEnd)/2, newN = Math.min(N-1, Math.round(n*1.6));
+    let ns = Math.round(mid-newN/2), ne = ns+newN;
+    if (ns<0){ne-=ns; ns=0;} if (ne>N-1){ns-=(ne-(N-1)); ne=N-1;}
+    viewStart = Math.max(0,ns); viewEnd = Math.min(N-1,ne); draw();
+  });
+  let currentTradeIdx = 0;
+  function jumpToTrade(i){
+    const signals = currentSignals();
+    if (!signals.length) return;
+    currentTradeIdx = Math.max(0, Math.min(signals.length-1, i));
+    const s = signals[currentTradeIdx];
+    const n = viewEnd - viewStart;
+    viewStart = Math.max(0, s.firstEntryIdx - Math.round(n*0.3));
+    viewEnd = Math.min(N-1, viewStart + n);
+    draw();
+  }
+  document.getElementById('btnPrevTrade').addEventListener('click', () => jumpToTrade(currentTradeIdx-1));
+  document.getElementById('btnNextTrade').addEventListener('click', () => jumpToTrade(currentTradeIdx+1));
+  document.getElementById('btnReset').addEventListener('click', () => {
+    viewStart = 0; viewEnd = N-1; draw();
+  });
+
+  function setFilter(f){
+    activeFilter = f;
+    currentTradeIdx = 0;
+    ['filterAll','filterSma21','filterSma100'].forEach(id => {
+      document.getElementById(id).setAttribute('aria-pressed', 'false');
+    });
+    const btnId = f===null ? 'filterAll' : 'filter'+f.replace('above','');
+    document.getElementById(btnId).setAttribute('aria-pressed', 'true');
+    updateStatTiles();
+    draw();
+  }
+  document.getElementById('filterAll').addEventListener('click', () => setFilter(null));
+  document.getElementById('filterSma21').addEventListener('click', () => setFilter('aboveSma21'));
+  document.getElementById('filterSma100').addEventListener('click', () => setFilter('aboveSma100'));
+
+  window.addEventListener('resize', resize);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+  resize();
+})();
+</script>

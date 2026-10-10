@@ -1,0 +1,497 @@
+<title>Stochastic Reversed Desk -- Jun 21-23 Sessioned</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --surface-0:#f2f1ec; --surface-1:#fcfcfb; --surface-2:#eeece5;
+    --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#898781;
+    --hairline:#e1e0d9; --accent:#2a78d6; --accent-wash:rgba(42,120,214,0.10);
+    --up:#0ca30c; --down:#d03b3b; --stochd:#eda100;
+    --chart-bg: 15,15,15;
+    --shadow: 0 1px 2px rgba(11,11,11,0.06), 0 8px 24px rgba(11,11,11,0.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --surface-0:#0d0e0f; --surface-1:#15171a; --surface-2:#1c1f23;
+      --text-primary:#eeece6; --text-secondary:#a6a39b; --text-muted:#716e67;
+      --hairline:#2a2d30; --accent:#3987e5; --accent-wash:rgba(57,135,229,0.14);
+      --up:#12c112; --down:#e6605f; --stochd:#c98500;
+      --chart-bg: 8,8,9;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --surface-0:#0d0e0f; --surface-1:#15171a; --surface-2:#1c1f23;
+    --text-primary:#eeece6; --text-secondary:#a6a39b; --text-muted:#716e67;
+    --hairline:#2a2d30; --accent:#3987e5; --accent-wash:rgba(57,135,229,0.14);
+    --up:#12c112; --down:#e6605f; --stochd:#c98500;
+    --chart-bg: 8,8,9;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  *{box-sizing:border-box;}
+  body{background:var(--surface-0); color:var(--text-primary); font-family:'IBM Plex Mono', ui-monospace, monospace;}
+  .wrap{max-width:1320px; margin:0 auto; padding:28px 20px 40px; display:flex; flex-direction:column; gap:16px;}
+  .header{display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; border-bottom:1px solid var(--hairline); padding-bottom:16px;}
+  .ticker h1{font-family:'Archivo', system-ui, sans-serif; font-weight:800; font-size:32px; letter-spacing:-0.01em; margin:0; text-wrap:balance;}
+  .ticker .sub{font-size:12.5px; color:var(--text-muted); margin-top:6px; max-width:92ch; line-height:1.6;}
+  .periods{display:flex; gap:6px; flex-wrap:wrap;}
+  .period-btn{font-family:'IBM Plex Mono', monospace; font-size:12.5px; font-weight:500; color:var(--text-secondary); background:var(--surface-1); border:1px solid var(--hairline); border-radius:7px; padding:8px 14px; cursor:pointer;}
+  .period-btn:hover{color:var(--text-primary); border-color:var(--text-muted);}
+  .period-btn[aria-pressed="true"]{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--hairline); border:1px solid var(--hairline); border-radius:10px; overflow:hidden;}
+  .tile{background:var(--surface-1); padding:12px 16px; display:flex; flex-direction:column; gap:4px;}
+  .tile .label{font-family:'Archivo', system-ui, sans-serif; font-size:10.5px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted);}
+  .tile .value{font-size:19px; font-weight:500; font-variant-numeric:tabular-nums;}
+  .tile .foot{font-size:11px; color:var(--text-secondary); font-variant-numeric:tabular-nums;}
+  .card{background:var(--surface-1); border:1px solid var(--hairline); border-radius:10px; box-shadow:var(--shadow); padding:14px 16px 12px;}
+  .card-head{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:8px;}
+  .card-title{font-family:'Archivo', system-ui, sans-serif; font-weight:700; font-size:14px;}
+  .controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .btn{font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:500; color:var(--text-secondary); background:var(--surface-1); border:1px solid var(--hairline); border-radius:7px; padding:6px 11px; cursor:pointer;}
+  .btn:hover{color:var(--text-primary); border-color:var(--text-muted);}
+  .legend{display:flex; align-items:center; gap:14px; font-size:11px; color:var(--text-secondary); flex-wrap:wrap;}
+  .legend .sw{display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px;}
+  .chart-shell{position:relative; border:1px solid var(--hairline); border-radius:7px; background:rgb(var(--chart-bg)); cursor:crosshair; overflow:hidden;}
+  .chart-shell.loading{opacity:0.45; pointer-events:none;}
+  .chart-shell.loading::after{content:"Loading period\2026"; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#eeece6; font-family:'IBM Plex Mono', monospace; font-size:13px;}
+  canvas#chart{display:block; width:100%;}
+  .readout{position:absolute; top:10px; left:12px; display:flex; gap:12px; flex-wrap:wrap; font-size:11px; background:rgba(20,20,22,0.94); color:#eee; border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:7px 11px; pointer-events:none; opacity:0; transition:opacity 0.1s; max-width:94%;}
+  .readout.show{opacity:1;}
+  .readout b{font-weight:600; color:#fff;}
+  .readout .ro-item{display:flex; gap:5px; color:#aaa; white-space:nowrap;}
+  .readout .ro-item.hl{color:#ff9d9d;}
+  .methodology-fold{background:var(--surface-1); border:1px solid var(--hairline); border-radius:10px; box-shadow:var(--shadow); padding:10px 16px;}
+  .methodology-fold summary{cursor:pointer; list-style:none; font-family:'Archivo', system-ui, sans-serif; font-weight:700; font-size:13px; color:var(--text-secondary);}
+  .methodology-fold summary::-webkit-details-marker{display:none;}
+  .methodology-fold summary::before{content:"\25B8 "; display:inline-block;}
+  .methodology-fold[open] summary::before{content:"\25BE ";}
+  .methodology-fold .body{margin-top:10px; font-size:11px; color:var(--text-muted); line-height:1.6;}
+  .methodology-fold table{border-collapse:collapse; margin-top:10px; font-size:11.5px; width:100%;}
+  .methodology-fold th, .methodology-fold td{text-align:right; padding:5px 10px; border-bottom:1px solid var(--hairline); font-variant-numeric:tabular-nums;}
+  .methodology-fold th:first-child, .methodology-fold td:first-child{text-align:left;}
+  .methodology-fold th{color:var(--text-muted); font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em;}
+  .pos{color:var(--up);} .neg{color:var(--down);}
+  .footer{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; font-size:11px; color:var(--text-muted); padding-top:4px;}
+  @media (max-width:640px){.tiles{grid-template-columns:repeat(2,1fr);} .ticker h1{font-size:24px;}}
+</style>
+
+<div class="wrap">
+  <div class="header">
+    <div class="ticker">
+      <h1>Stochastic Reversed Desk &mdash; Jun 21-23, sessioned</h1>
+      <div class="sub">Three trading sessions, NQ 09-26, 1-min bars, matching NT8's session template: <b>no new entries after 16:15 ET, trading resumes at 18:00 ET</b> for the next session (existing open trades are unaffected and still exit normally on target/stop) &mdash; <b>except on the period's last day (Jun 23), where 16:15 is a hard stop with no 18:00 resume</b>, since there's no further day in this period to trade into. Stochastic %K(30)/%D(7), smoothing 3, Overbought 90 / Oversold 10, <b>Reverse All Signals: ON</b>, 60pt profit target / 30pt stop loss (2:1 reward:risk). <b>Note:</b> this is the first ~2.5 days our tick capture (TickRecorder.cs) has data for this contract -- there's no prior history to warm the Stochastic up with, so the first ~40 bars (until roughly 11:20 ET on Jun 21) have no valid %K/%D and can't signal. Timestamps corrected for the +8h DB labeling bug found in this conversation.</div>
+    </div>
+    <div class="periods" id="periodButtons" style="display:none;"></div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><span class="label">Trades (long / short)</span><span class="value" id="tileTradeCount">&mdash;</span><span class="foot" id="tileLongShort">&mdash;</span></div>
+    <div class="tile"><span class="label">Win rate</span><span class="value" id="tileWinRate">&mdash;</span><span class="foot" id="tileTpSl">&mdash;</span></div>
+    <div class="tile"><span class="label">Total P&amp;L</span><span class="value" id="tileTotalPnl">&mdash;</span><span class="foot">NQ points, 60pt TP / 30pt SL</span></div>
+    <div class="tile"><span class="label">Avg P&amp;L / trade</span><span class="value" id="tileAvgPnl">&mdash;</span><span class="foot" id="tilePeriodLabel">&mdash;</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Price &middot; Stochastic %K/%D (90/10, reversed)</span>
+      <div class="controls">
+        <button class="btn" id="btnZoomOut">&minus; zoom out</button>
+        <button class="btn" id="btnZoomIn">+ zoom in</button>
+        <button class="btn" id="btnPrevTrade">&lsaquo; prev trade</button>
+        <button class="btn" id="btnNextTrade">next trade &rsaquo;</button>
+        <button class="btn" id="btnReset">Reset view</button>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--up);"></span>Up candle</span>
+      <span><span class="sw" style="background:var(--down);"></span>Down candle</span>
+      <span><span class="sw" style="background:var(--stochd);"></span>Stochastic %D</span>
+      <span>&#9650; green long &middot; &#9660; red short &middot; &#9679; gray exit &middot; dashed = win/loss</span>
+      <span style="color:var(--text-muted);">drag to pan &middot; scroll to zoom &middot; hover for + cursor</span>
+    </div>
+    <div class="chart-shell" id="chartShell">
+      <canvas id="chart"></canvas>
+      <div class="readout" id="readout"></div>
+    </div>
+  </div>
+
+  <details class="methodology-fold" open>
+    <summary>Why just three days, and what it can/can't tell us</summary>
+    <div class="body">
+      This is a direct Python port of <code>StochExtremesStrategy.cs</code>'s Stochastic-only path with <code>ReverseAllSignals</code> on: same %K/%D math (raw %K over the K period, smoothed, then %D as an SMA of smoothed %K), same fresh-cross-only trigger, same one-position-at-a-time, same fixed-points TP/SL checked bar-by-bar (stop assumed to win if both would hit the same bar), now with a session-boundary entry filter matching NT8's Strategy Tester's daily session template (16:15 ET cutoff, 18:00 ET resume, no resume on the period's final day). Three days of 1-min bars is still far too small a sample to judge whether this rule works -- this chart exists to let specific days' signals be inspected directly, e.g. to compare against what NinjaTrader shows for the same sessions bar-by-bar.
+    </div>
+    <table id="summaryTable"><thead><tr><th>Period</th><th>Trades</th><th>Win rate</th><th>Total P&amp;L</th><th>Avg/trade</th><th>TP hits</th><th>SL hits</th></tr></thead><tbody></tbody></table>
+  </details>
+
+  <div class="footer">
+    <span>Source: NinjaTrader TickRecorder.cs -&gt; Postgres -&gt; 1-min OHLCV aggregated server-side. Timestamps shown are corrected to NT8's actual Eastern display (raw DB storage was +8h off).</span>
+    <span id="footGenerated"></span>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // Each period's bars+trades live in their own published JSON file (1-min bars over a full
+  // ~3-month contract are too large to embed inline for all 3 periods at once) and are
+  // fetched on demand, cached in memory after first load.
+  const PERIOD_META = {"DAY0621_23": {"label": "NQ 09-26 -- Jun 21-23, 2026 (ET, sessioned)", "file": "period_DAY0621_0623.json"}};
+  const ORDER = ["DAY0621_23"];
+  const cache = {};
+
+  document.getElementById('footGenerated').textContent = 'Chart built ' + new Date().toISOString().slice(0,16).replace('T',' ') + ' UTC';
+
+  let currentKey = ORDER[0];
+
+  function summarize(key){
+    const p = cache[key];
+    const trades = p.trades;
+    const wins = trades.filter(t => t.pnl > 0).length;
+    const total = trades.reduce((s,t) => s+t.pnl, 0);
+    const tpHits = trades.filter(t => t.reason==='TP').length;
+    const slHits = trades.filter(t => t.reason && t.reason.indexOf('SL')===0).length;
+    const nLong = trades.filter(t => t.direction==='long').length;
+    const nShort = trades.filter(t => t.direction==='short').length;
+    return {trades: trades.length, wins, total, tpHits, slHits, nLong, nShort,
+      winRate: trades.length ? 100*wins/trades.length : 0, avg: trades.length ? total/trades.length : 0};
+  }
+
+  const periodBtns = document.getElementById('periodButtons');
+  ORDER.forEach(key => {
+    const btn = document.createElement('button');
+    btn.className = 'period-btn';
+    btn.textContent = PERIOD_META[key].label;
+    btn.setAttribute('aria-pressed', key === currentKey ? 'true' : 'false');
+    btn.addEventListener('click', () => selectPeriod(key));
+    periodBtns.appendChild(btn);
+  });
+
+  function updateTiles(key){
+    const s = summarize(key);
+    document.getElementById('tileTradeCount').textContent = s.trades;
+    document.getElementById('tileLongShort').textContent = s.nLong + ' long / ' + s.nShort + ' short';
+    document.getElementById('tileWinRate').textContent = s.winRate.toFixed(1) + '%';
+    document.getElementById('tileTpSl').textContent = s.tpHits + ' TP / ' + s.slHits + ' SL hits';
+    document.getElementById('tileTotalPnl').textContent = (s.total>=0?'+':'') + s.total.toFixed(1) + ' pts';
+    document.getElementById('tileAvgPnl').textContent = (s.avg>=0?'+':'') + s.avg.toFixed(1) + ' pts';
+    document.getElementById('tilePeriodLabel').textContent = PERIOD_META[key].label;
+  }
+
+  function buildSummaryRow(key){
+    const s = summarize(key);
+    const tr = document.createElement('tr');
+    tr.id = 'summaryRow_' + key;
+    const cls = s.total >= 0 ? 'pos' : 'neg';
+    tr.innerHTML = '<td>'+PERIOD_META[key].label+'</td><td>'+s.trades+'</td><td>'+s.winRate.toFixed(1)+'%</td>'+
+      '<td class="'+cls+'">'+(s.total>=0?'+':'')+s.total.toFixed(1)+'</td><td class="'+cls+'">'+(s.avg>=0?'+':'')+s.avg.toFixed(1)+'</td>'+
+      '<td>'+s.tpHits+'</td><td>'+s.slHits+'</td>';
+    return tr;
+  }
+
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const shell = document.getElementById('chartShell');
+  const readout = document.getElementById('readout');
+
+  let BARS, TRADES, N, viewStart, viewEnd;
+  let visibleTradeMarkers = [];
+  let mouseX = null, mouseY = null;
+
+  async function fetchPeriod(key){
+    if (cache[key]) return cache[key];
+    const res = await fetch(PERIOD_META[key].file);
+    const data = await res.json();
+    cache[key] = data;
+    return data;
+  }
+
+  function loadPeriod(key){
+    BARS = cache[key].bars;
+    TRADES = cache[key].trades;
+    N = BARS.length;
+    viewStart = Math.max(0, N - 400);
+    viewEnd = N - 1;
+  }
+
+  async function selectPeriod(key){
+    currentKey = key;
+    Array.from(periodBtns.children).forEach((btn, i) => btn.setAttribute('aria-pressed', ORDER[i] === key ? 'true' : 'false'));
+    shell.classList.add('loading');
+    await fetchPeriod(key);
+    if (currentKey !== key) return; // a later click superseded this fetch
+    shell.classList.remove('loading');
+    loadPeriod(key);
+    updateTiles(key);
+    mouseX = null; mouseY = null;
+    readout.classList.remove('show');
+    draw();
+  }
+
+  function isDark(){
+    const stamp = document.documentElement.getAttribute('data-theme');
+    if (stamp === 'dark') return true;
+    if (stamp === 'light') return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  let W = 0, H = 0, DPR = 1;
+  const LEFT_PAD = 68, RIGHT_PAD = 14;
+  const PANEL = { price: {top: 20, height: 340}, stoch: {top: 380, height: 130} };
+  const AXIS_BOTTOM = 536;
+
+  function resize(){
+    DPR = window.devicePixelRatio || 1;
+    W = shell.clientWidth;
+    H = 560;
+    canvas.style.height = H + 'px';
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    draw();
+  }
+
+  function xForIndex(i){
+    const n = viewEnd - viewStart;
+    return LEFT_PAD + ((i - viewStart) / Math.max(1,n)) * (W - LEFT_PAD - RIGHT_PAD);
+  }
+  function indexForX(x){
+    const n = viewEnd - viewStart;
+    const frac = (x - LEFT_PAD) / (W - LEFT_PAD - RIGHT_PAD);
+    return Math.round(viewStart + frac * n);
+  }
+  function yIn(panel, lo, hi, v){
+    return panel.top + panel.height * (1 - (v-lo)/(hi-lo || 1));
+  }
+
+  function gridAndLabels(top, height, lo, hi, muted, nlines){
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+    ctx.fillStyle = muted; ctx.font = '9.5px "IBM Plex Mono", monospace'; ctx.textAlign = 'right';
+    for (let g=0; g<=nlines; g++){
+      const y = top + height/nlines*g;
+      ctx.beginPath(); ctx.moveTo(LEFT_PAD,y); ctx.lineTo(W-RIGHT_PAD,y); ctx.stroke();
+      const val = hi - (hi-lo)*(g/nlines);
+      ctx.fillText(val.toFixed(1), LEFT_PAD-6, y+3);
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // The chart canvas background is always near-black (rgb(var(--chart-bg))) regardless of
+    // the page's light/dark theme, so canvas text/lines use fixed light colors here -- tying
+    // them to isDark() (the page theme) previously drew near-black ink on a near-black canvas
+    // in light-page-theme mode, making labels and the crosshair invisible.
+    const ink = '#eeece6';
+    const muted = '#a6a19a';
+    const up = cssVar('--up'), down = cssVar('--down'), stochd = cssVar('--stochd'), accent = cssVar('--accent');
+
+    const slice = BARS.slice(viewStart, viewEnd+1);
+    if (slice.length < 2) return;
+
+    let lo=Infinity, hi=-Infinity;
+    slice.forEach(b => { if (b.l<lo) lo=b.l; if (b.h>hi) hi=b.h; });
+    const pad = (hi-lo)*0.06 || 1;
+    const pLo = lo-pad, pHi = hi+pad;
+    gridAndLabels(PANEL.price.top, PANEL.price.height, pLo, pHi, muted, 5);
+    const bw = Math.max(1.5, (W-LEFT_PAD-RIGHT_PAD)/(viewEnd-viewStart+1)*0.7);
+    slice.forEach((b, idx) => {
+      const x = xForIndex(viewStart+idx);
+      const isUp = b.c >= b.o;
+      ctx.strokeStyle = isUp?up:down; ctx.fillStyle = isUp?up:down; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, yIn(PANEL.price,pLo,pHi,b.h)); ctx.lineTo(x, yIn(PANEL.price,pLo,pHi,b.l)); ctx.stroke();
+      const yO = yIn(PANEL.price,pLo,pHi,b.o), yC = yIn(PANEL.price,pLo,pHi,b.c);
+      ctx.fillRect(x-bw/2, Math.min(yO,yC), bw, Math.max(1,Math.abs(yC-yO)));
+    });
+    ctx.fillStyle = ink; ctx.font = '600 11px Archivo, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('PRICE', LEFT_PAD, PANEL.price.top - 6);
+
+    const good='#0ca30c', bad='#d03b3b', exitColor = '#c3c2b7';
+    visibleTradeMarkers = [];
+    TRADES.forEach(t => {
+      const entryVisible = t.entryIdx>=viewStart && t.entryIdx<=viewEnd;
+      const exitVisible = t.exitIdx>=viewStart && t.exitIdx<=viewEnd;
+      if (!entryVisible && !exitVisible) return;
+      const ex = xForIndex(t.entryIdx), ey = yIn(PANEL.price,pLo,pHi,t.entryP);
+      const xx = xForIndex(t.exitIdx), xy = yIn(PANEL.price,pLo,pHi,t.exitP);
+      const isLong = t.direction==='long';
+      ctx.setLineDash([3,3]); ctx.strokeStyle = t.pnl>=0?good:bad; ctx.globalAlpha=0.55; ctx.lineWidth=1.3;
+      ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(xx,xy); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha=1;
+      if (entryVisible){
+        ctx.fillStyle = isLong?good:bad; ctx.beginPath();
+        if (isLong){ ctx.moveTo(ex,ey-8); ctx.lineTo(ex-5,ey+2); ctx.lineTo(ex+5,ey+2); }
+        else { ctx.moveTo(ex,ey+8); ctx.lineTo(ex-5,ey-2); ctx.lineTo(ex+5,ey-2); }
+        ctx.closePath(); ctx.fill();
+        visibleTradeMarkers.push({x:ex,y:ey+(isLong?-3:3),trade:t});
+      }
+      if (exitVisible){
+        ctx.fillStyle = exitColor; ctx.beginPath(); ctx.arc(xx,xy,3.5,0,Math.PI*2); ctx.fill();
+        visibleTradeMarkers.push({x:xx,y:xy,trade:t});
+      }
+    });
+
+    gridAndLabels(PANEL.stoch.top, PANEL.stoch.height, 0, 100, muted, 2);
+    ctx.save(); ctx.setLineDash([3,3]); ctx.lineWidth=1;
+    ctx.strokeStyle = up;
+    const y90=yIn(PANEL.stoch,0,100,90); ctx.beginPath(); ctx.moveTo(LEFT_PAD,y90); ctx.lineTo(W-RIGHT_PAD,y90); ctx.stroke();
+    ctx.strokeStyle = down;
+    const y10=yIn(PANEL.stoch,0,100,10); ctx.beginPath(); ctx.moveTo(LEFT_PAD,y10); ctx.lineTo(W-RIGHT_PAD,y10); ctx.stroke();
+    ctx.restore();
+    ctx.beginPath(); ctx.strokeStyle = accent; ctx.lineWidth=1.2; let started=false;
+    slice.forEach((b,idx)=>{ if(b.stoch_k==null) return; const x=xForIndex(viewStart+idx), y=yIn(PANEL.stoch,0,100,b.stoch_k); if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y); });
+    ctx.stroke();
+    ctx.beginPath(); ctx.strokeStyle = stochd; ctx.lineWidth=1; started=false;
+    slice.forEach((b,idx)=>{ if(b.stoch_d==null) return; const x=xForIndex(viewStart+idx), y=yIn(PANEL.stoch,0,100,b.stoch_d); if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y); });
+    ctx.stroke();
+    ctx.fillStyle = ink; ctx.font = '600 11px Archivo, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('STOCHASTIC %K/%D (90 green=Long trigger / 10 red=Short trigger, reversed)', LEFT_PAD, PANEL.stoch.top - 6);
+
+    ctx.fillStyle = muted; ctx.font = '10px "IBM Plex Mono", monospace'; ctx.textAlign='center';
+    const labelCount = 6;
+    for (let k=0;k<=labelCount;k++){
+      const i = Math.round(viewStart + (viewEnd-viewStart)*(k/labelCount));
+      const b = BARS[Math.min(N-1,Math.max(0,i))];
+      const dt = new Date(b.t);
+      ctx.fillText(dt.toISOString().slice(5,16).replace('T',' '), xForIndex(i), AXIS_BOTTOM);
+    }
+
+    // --- + crosshair, spans both panels vertically, horizontal only in hovered panel ---
+    // Fixed white regardless of page theme -- the canvas background is always near-black,
+    // so this no longer keys off the page's light/dark setting (that was the actual bug:
+    // in light-page-theme mode the crosshair was drawing near-black on near-black).
+    if (mouseX != null && mouseX >= LEFT_PAD && mouseX <= W-RIGHT_PAD){
+      ctx.save();
+      ctx.setLineDash([4,3]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(mouseX, PANEL.price.top); ctx.lineTo(mouseX, PANEL.stoch.top+PANEL.stoch.height); ctx.stroke();
+
+      let hoveredPanel = null, hLo=0, hHi=0;
+      if (mouseY >= PANEL.price.top && mouseY <= PANEL.price.top+PANEL.price.height){ hoveredPanel = PANEL.price; hLo=pLo; hHi=pHi; }
+      else if (mouseY >= PANEL.stoch.top && mouseY <= PANEL.stoch.top+PANEL.stoch.height){ hoveredPanel = PANEL.stoch; hLo=0; hHi=100; }
+
+      if (hoveredPanel){
+        ctx.beginPath(); ctx.moveTo(LEFT_PAD, mouseY); ctx.lineTo(W-RIGHT_PAD, mouseY); ctx.stroke();
+        ctx.setLineDash([]);
+        const val = hHi - (hHi-hLo) * ((mouseY - hoveredPanel.top) / hoveredPanel.height);
+        const label = hoveredPanel === PANEL.price ? val.toFixed(2) : val.toFixed(1);
+        ctx.font = '10.5px "IBM Plex Mono", monospace';
+        const lw = ctx.measureText(label).width + 10;
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.fillRect(2, mouseY-8, lw, 16);
+        ctx.fillStyle = '#0b0b0b'; ctx.textAlign = 'left';
+        ctx.fillText(label, 6, mouseY+4);
+      }
+
+      const hoverIdx = Math.min(N-1, Math.max(0, indexForX(mouseX)));
+      const hb = BARS[hoverIdx];
+      if (hb){
+        const tLabel = new Date(hb.t).toISOString().slice(5,16).replace('T',' ');
+        ctx.font = '10.5px "IBM Plex Mono", monospace';
+        const tw = ctx.measureText(tLabel).width + 10;
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.fillRect(Math.min(mouseX-tw/2, W-RIGHT_PAD-tw), AXIS_BOTTOM-11, tw, 15);
+        ctx.fillStyle = '#0b0b0b'; ctx.textAlign = 'center';
+        ctx.fillText(tLabel, Math.min(mouseX, W-RIGHT_PAD-tw/2), AXIS_BOTTOM);
+      }
+      ctx.restore();
+    }
+  }
+
+  let dragging=false, dragStartX=0, dragStartView=[0,0];
+  canvas.addEventListener('mousedown', e => { dragging=true; dragStartX=e.clientX; dragStartView=[viewStart,viewEnd]; canvas.style.cursor='grabbing'; });
+  window.addEventListener('mouseup', () => { dragging=false; canvas.style.cursor='crosshair'; });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dxPx = e.clientX - dragStartX;
+    const n = dragStartView[1]-dragStartView[0];
+    const dIdx = Math.round(-dxPx / ((W-LEFT_PAD-RIGHT_PAD)/Math.max(1,n)));
+    let ns=dragStartView[0]+dIdx, ne=dragStartView[1]+dIdx;
+    if (ns<0){ne-=ns; ns=0;} if (ne>N-1){ns-=(ne-(N-1)); ne=N-1;}
+    viewStart=Math.max(0,ns); viewEnd=ne; draw();
+  });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const centerIdx = indexForX(e.clientX-rect.left);
+    const n = viewEnd-viewStart;
+    const factor = e.deltaY>0?1.15:0.87;
+    let newN = Math.max(20, Math.min(N-1, Math.round(n*factor)));
+    let ns = Math.round(centerIdx - (centerIdx-viewStart)*(newN/n));
+    let ne = ns+newN;
+    if (ns<0){ne-=ns; ns=0;} if (ne>N-1){ns-=(ne-(N-1)); ne=N-1;}
+    viewStart=Math.max(0,ns); viewEnd=Math.min(N-1,ne); draw();
+  }, {passive:false});
+
+  canvas.addEventListener('mousemove', e => {
+    if (dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX-rect.left, y = e.clientY-rect.top;
+    mouseX = x; mouseY = y;
+
+    let nearest=null, nd2=11*11;
+    visibleTradeMarkers.forEach(m => { const d2=(m.x-x)*(m.x-x)+(m.y-y)*(m.y-y); if(d2<nd2){nd2=d2; nearest=m;} });
+    if (nearest){
+      const t = nearest.trade; const win = t.pnl>=0;
+      readout.innerHTML = '<span class="ro-item"><b>'+t.direction.toUpperCase()+' '+(win?'(win)':'(loss)')+'</b></span>'+
+        '<span class="ro-item">entry <b>'+new Date(t.entryT).toISOString().slice(0,16).replace('T',' ')+' @ '+t.entryP.toFixed(2)+'</b></span>'+
+        '<span class="ro-item">exit <b>'+new Date(t.exitT).toISOString().slice(0,16).replace('T',' ')+' @ '+t.exitP.toFixed(2)+'</b> ('+t.reason+')</span>'+
+        '<span class="ro-item'+(win?'':' hl')+'">P&amp;L <b>'+(t.pnl>=0?'+':'')+t.pnl.toFixed(2)+' pts</b></span>'+
+        '<span class="ro-item">stoch %K at entry <b>'+t.stochK.toFixed(1)+'</b></span>';
+      readout.classList.add('show');
+    } else {
+      readout.classList.remove('show');
+    }
+    draw();
+  });
+  canvas.addEventListener('mouseleave', () => { readout.classList.remove('show'); mouseX=null; mouseY=null; draw(); });
+
+  let currentTradeIdx = 0;
+  function jumpToTrade(i){
+    if (!TRADES.length) return;
+    currentTradeIdx = Math.max(0, Math.min(TRADES.length-1, i));
+    const t = TRADES[currentTradeIdx];
+    const n = viewEnd-viewStart;
+    viewStart = Math.max(0, t.entryIdx - Math.round(n*0.3));
+    viewEnd = Math.min(N-1, viewStart+n);
+    draw();
+  }
+  document.getElementById('btnPrevTrade').addEventListener('click', () => jumpToTrade(currentTradeIdx-1));
+  document.getElementById('btnNextTrade').addEventListener('click', () => jumpToTrade(currentTradeIdx+1));
+  document.getElementById('btnZoomIn').addEventListener('click', () => {
+    const n=viewEnd-viewStart, mid=(viewStart+viewEnd)/2, newN=Math.max(20,Math.round(n*0.6));
+    viewStart=Math.max(0,Math.round(mid-newN/2)); viewEnd=Math.min(N-1,viewStart+newN); draw();
+  });
+  document.getElementById('btnZoomOut').addEventListener('click', () => {
+    const n=viewEnd-viewStart, mid=(viewStart+viewEnd)/2, newN=Math.min(N-1,Math.round(n*1.6));
+    let ns=Math.round(mid-newN/2), ne=ns+newN;
+    if(ns<0){ne-=ns;ns=0;} if(ne>N-1){ns-=(ne-(N-1)); ne=N-1;}
+    viewStart=Math.max(0,ns); viewEnd=Math.min(N-1,ne); draw();
+  });
+  document.getElementById('btnReset').addEventListener('click', () => { viewStart=Math.max(0,N-400); viewEnd=N-1; draw(); });
+
+  window.addEventListener('resize', resize);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+
+  (async function init(){
+    shell.classList.add('loading');
+    await fetchPeriod(currentKey);
+    shell.classList.remove('loading');
+    loadPeriod(currentKey);
+    updateTiles(currentKey);
+    const summaryBody = document.querySelector('#summaryTable tbody');
+    summaryBody.appendChild(buildSummaryRow(currentKey));
+    resize();
+    // Remaining periods load in the background so the summary table fills in without
+    // blocking the first render.
+    for (const key of ORDER){
+      if (key === currentKey) continue;
+      await fetchPeriod(key);
+      summaryBody.appendChild(buildSummaryRow(key));
+    }
+  })();
+})();
+</script>

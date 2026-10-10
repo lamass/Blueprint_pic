@@ -1,0 +1,1763 @@
+<meta charset="UTF-8">
+<title>Gamma Exposure Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --surface-0:#f2f1ec;
+    --surface-1:#fcfcfb;
+    --surface-2:#eeece5;
+    --text-primary:#0b0b0b;
+    --text-secondary:#52514e;
+    --text-muted:#898781;
+    --hairline:#e1e0d9;
+    --accent:#2a78d6;
+    --accent-wash:rgba(42,120,214,0.10);
+    --up:#0ca30c;
+    --down:#d03b3b;
+    --warn:#fab219;
+    --warn-wash:rgba(250,178,25,0.14);
+    --itm-wash: rgba(42,120,214,0.06);
+    --heat-hue: 355;
+    --chart-bg: 15,15,15;
+    --shadow: 0 1px 2px rgba(11,11,11,0.06), 0 8px 24px rgba(11,11,11,0.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --surface-0:#0d0e0f;
+      --surface-1:#15171a;
+      --surface-2:#1c1f23;
+      --text-primary:#eeece6;
+      --text-secondary:#a6a39b;
+      --text-muted:#716e67;
+      --hairline:#2a2d30;
+      --accent:#5b9bec;
+      --accent-wash:rgba(91,155,236,0.14);
+      --up:#12c112;
+      --down:#e6605f;
+      --warn:#fab219;
+      --warn-wash:rgba(250,178,25,0.14);
+      --itm-wash: rgba(91,155,236,0.08);
+      --chart-bg: 8,8,9;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --surface-0:#0d0e0f;
+    --surface-1:#15171a;
+    --surface-2:#1c1f23;
+    --text-primary:#eeece6;
+    --text-secondary:#a6a39b;
+    --text-muted:#716e67;
+    --hairline:#2a2d30;
+    --accent:#5b9bec;
+    --accent-wash:rgba(91,155,236,0.14);
+    --up:#12c112;
+    --down:#e6605f;
+    --warn:#fab219;
+    --warn-wash:rgba(250,178,25,0.14);
+    --itm-wash: rgba(91,155,236,0.08);
+    --chart-bg: 8,8,9;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--surface-0);
+    color:var(--text-primary);
+    font-family:'IBM Plex Mono', ui-monospace, monospace;
+  }
+  .wrap{
+    max-width:1280px;
+    margin:0 auto;
+    padding:28px 20px 40px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+
+  .header{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap;
+    border-bottom:1px solid var(--hairline); padding-bottom:16px;
+  }
+  .ticker{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
+  .ticker h1{
+    font-family:'Archivo', system-ui, sans-serif; font-weight:800; font-size:34px;
+    letter-spacing:-0.01em; margin:0; text-wrap:balance;
+  }
+  .ticker .sub{width:100%; font-size:12.5px; color:var(--text-muted); margin-top:2px; max-width:86ch;}
+  .segmented{display:flex; border:1px solid var(--hairline); border-radius:7px; overflow:hidden;}
+  .segmented button{
+    font-family:'IBM Plex Mono', monospace; font-size:13px; font-weight:500; color:var(--text-secondary);
+    background:var(--surface-1); border:none; padding:8px 16px; cursor:pointer;
+  }
+  .segmented button + button{border-left:1px solid var(--hairline);}
+  .segmented button[aria-pressed="true"]{background:var(--accent); color:#fff;}
+  .reset-zoom-btn{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; font-weight:500; color:var(--text-secondary);
+    background:var(--surface-1); border:1px solid var(--hairline); border-radius:7px; padding:7px 12px; cursor:pointer;
+  }
+  .reset-zoom-btn:hover{color:var(--text-primary); border-color:var(--text-muted);}
+  .reset-zoom-btn[aria-pressed="true"]{background:var(--accent); color:#fff; border-color:var(--accent);}
+
+  .banner{
+    display:none;
+    align-items:flex-start; gap:10px;
+    background:var(--warn-wash); border:1px solid var(--warn); border-radius:8px;
+    padding:10px 14px; font-size:12px; color:var(--text-primary);
+  }
+  .banner.show{display:flex;}
+  .banner b{color:var(--warn);}
+
+  .tiles{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
+    background:var(--hairline); border:1px solid var(--hairline); border-radius:10px; overflow:hidden;
+  }
+  .tile{background:var(--surface-1); padding:12px 16px; display:flex; flex-direction:column; gap:4px;}
+  .tile .label{
+    font-family:'Archivo', system-ui, sans-serif; font-size:11px; font-weight:600;
+    letter-spacing:0.06em; text-transform:uppercase; color:var(--text-muted);
+  }
+  .tile .value{font-size:20px; font-weight:500; font-variant-numeric:tabular-nums;}
+  .tile .foot{font-size:11.5px; color:var(--text-secondary); font-variant-numeric:tabular-nums;}
+
+  .card{
+    background:var(--surface-1); border:1px solid var(--hairline); border-radius:10px;
+    box-shadow:var(--shadow); padding:14px 16px 12px;
+  }
+  .card-head{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px;}
+  .card-title{font-family:'Archivo', system-ui, sans-serif; font-weight:700; font-size:14px;}
+  .card-title .exp-detail{font-weight:500; color:var(--text-muted); font-size:12px; margin-left:8px;}
+
+  .exp-tabs{display:flex; border:1px solid var(--hairline); border-radius:7px; overflow:hidden;}
+  .exp-tabs button{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--text-secondary);
+    background:var(--surface-1); border:none; padding:6px 12px; cursor:pointer;
+  }
+  .exp-tabs button + button{border-left:1px solid var(--hairline);}
+  .exp-tabs button[aria-pressed="true"]{background:var(--accent-wash); color:var(--accent); font-weight:600;}
+
+  .chain-wrap{overflow-x:auto; border:1px solid var(--hairline); border-radius:7px;}
+  table.chain{width:100%; border-collapse:collapse; font-size:11.5px; min-width:980px;}
+  table.chain thead th{
+    position:sticky; top:0; background:var(--surface-2);
+    font-family:'Archivo', system-ui, sans-serif; font-weight:600; font-size:10px;
+    letter-spacing:0.04em; text-transform:uppercase; color:var(--text-muted);
+    padding:7px 8px; border-bottom:1px solid var(--hairline); text-align:right; white-space:nowrap;
+  }
+  table.chain thead th.strike-col{text-align:center; color:var(--text-secondary);}
+  table.chain thead tr.group-row th{background:var(--surface-1); border-bottom:none; padding-top:8px; padding-bottom:2px;}
+  table.chain tbody td{
+    padding:4px 8px; text-align:right; font-variant-numeric:tabular-nums;
+    color:var(--text-secondary); border-bottom:1px solid var(--hairline); white-space:nowrap;
+  }
+  table.chain tbody tr.calls-itm td.call-cell{background:var(--itm-wash);}
+  table.chain tbody tr.puts-itm td.put-cell{background:var(--itm-wash);}
+  table.chain tbody td.strike-cell{
+    text-align:center; font-weight:600; color:var(--text-primary);
+    border-left:1px solid var(--hairline); border-right:1px solid var(--hairline);
+    cursor:help; text-decoration:underline dotted var(--text-muted); text-underline-offset:3px;
+  }
+  table.chain tbody tr.atm-row td{background:var(--accent-wash);}
+
+  /* tier-colored row outlines mirror the chart's green/orange/yellow bands,
+     so a strike you spot as important on the chart is easy to find in the
+     table too. Defined before .new-row so NEW (red) wins if both apply. */
+  table.chain tbody tr.tier-green td{box-shadow: inset 0 1px 0 #1baf7a, inset 0 -1px 0 #1baf7a;}
+  table.chain tbody tr.tier-green td:first-child{box-shadow: inset 0 1px 0 #1baf7a, inset 0 -1px 0 #1baf7a, inset 2px 0 0 #1baf7a;}
+  table.chain tbody tr.tier-green td:last-child{box-shadow: inset 0 1px 0 #1baf7a, inset 0 -1px 0 #1baf7a, inset -2px 0 0 #1baf7a;}
+  table.chain tbody tr.tier-orange td{box-shadow: inset 0 1px 0 #eb6834, inset 0 -1px 0 #eb6834;}
+  table.chain tbody tr.tier-orange td:first-child{box-shadow: inset 0 1px 0 #eb6834, inset 0 -1px 0 #eb6834, inset 2px 0 0 #eb6834;}
+  table.chain tbody tr.tier-orange td:last-child{box-shadow: inset 0 1px 0 #eb6834, inset 0 -1px 0 #eb6834, inset -2px 0 0 #eb6834;}
+  table.chain tbody tr.tier-yellow td{box-shadow: inset 0 1px 0 #eda100, inset 0 -1px 0 #eda100;}
+  table.chain tbody tr.tier-yellow td:first-child{box-shadow: inset 0 1px 0 #eda100, inset 0 -1px 0 #eda100, inset 2px 0 0 #eda100;}
+  table.chain tbody tr.tier-yellow td:last-child{box-shadow: inset 0 1px 0 #eda100, inset 0 -1px 0 #eda100, inset -2px 0 0 #eda100;}
+
+  table.chain tbody tr.new-row td{box-shadow: inset 0 1px 0 #e6605f, inset 0 -1px 0 #e6605f;}
+  table.chain tbody tr.new-row td:first-child{box-shadow: inset 0 1px 0 #e6605f, inset 0 -1px 0 #e6605f, inset 2px 0 0 #e6605f;}
+  table.chain tbody tr.new-row td:last-child{box-shadow: inset 0 1px 0 #e6605f, inset 0 -1px 0 #e6605f, inset -2px 0 0 #e6605f;}
+  table.chain tbody tr.atm-row td.strike-cell{color:var(--accent); font-weight:700;}
+  table.chain tbody td.vol-cell, table.chain tbody td.gamma-cell{color:var(--text-primary);}
+  table.chain tbody tr:hover td{filter:brightness(1.06);}
+  .chain-scroll{max-height:420px; overflow-y:auto;}
+
+  .methodology{font-size:11px; color:var(--text-muted); margin:0 0 10px; max-width:90ch;}
+  .methodology-fold{
+    background:var(--surface-1); border:1px solid var(--hairline); border-radius:10px;
+    box-shadow:var(--shadow); padding:10px 16px;
+  }
+  .methodology-fold summary{
+    cursor:pointer; list-style:none; font-family:'Archivo', system-ui, sans-serif;
+    font-weight:700; font-size:13px; color:var(--text-secondary);
+  }
+  .methodology-fold summary::-webkit-details-marker{display:none;}
+  .methodology-fold summary::before{content:"\25B8 "; display:inline-block; transition:transform 0.1s;}
+  .methodology-fold[open] summary::before{transform:rotate(90deg);}
+  .methodology-fold .methodology{margin-top:10px; margin-bottom:2px;}
+  .methodology-fold .methodology-cols{
+    display:grid; grid-template-columns:1fr 1fr; gap:0 24px;
+  }
+  .methodology-fold .methodology-cols .methodology{margin-top:10px;}
+  @media (max-width:800px){
+    .methodology-fold .methodology-cols{grid-template-columns:1fr;}
+  }
+  .threshold-row{
+    display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;
+    font-size:12px; color:var(--text-secondary);
+  }
+  .threshold-row input[type="range"]{width:220px; accent-color:var(--accent);}
+  .threshold-row b{color:var(--text-primary); font-variant-numeric:tabular-nums;}
+  .threshold-row label{display:flex; align-items:center; gap:5px;}
+  .threshold-row input[type="number"]{
+    width:80px; font-family:'IBM Plex Mono', monospace; font-size:12px;
+    font-variant-numeric:tabular-nums; color:var(--text-primary);
+    background:var(--surface-1); border:1px solid var(--hairline); border-radius:5px;
+    padding:3px 6px;
+  }
+  .mode-controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .mode-controls[hidden]{display:none;}
+  #gradientIntensityInput{width:120px;}
+  .threshold-row input[type="color"]{
+    width:32px; height:24px; padding:1px 2px; border:1px solid var(--hairline);
+    border-radius:5px; background:var(--surface-1); cursor:pointer;
+  }
+  .legend-swatches{display:flex; align-items:center; gap:8px; margin-left:auto;}
+  .legend-ramp{
+    width:120px; height:12px; border-radius:3px;
+    background:linear-gradient(to right, hsla(var(--heat-hue),85%,45%,0.05), hsla(var(--heat-hue),85%,50%,0.55), hsla(var(--heat-hue),95%,60%,1));
+    border:1px solid var(--hairline);
+  }
+
+  .chart-shell{
+    position:relative; border:1px solid var(--hairline); border-radius:7px;
+    background: rgb(var(--chart-bg));
+  }
+  canvas#chart{display:block; width:100%; cursor:crosshair;}
+  .readout{
+    position:absolute; top:10px; left:12px; display:flex; gap:14px; font-size:12px;
+    background:rgba(20,20,22,0.92); color:#eee; border:1px solid rgba(255,255,255,0.12); border-radius:6px;
+    padding:6px 10px; pointer-events:none; opacity:0; transition:opacity 0.1s;
+  }
+  .readout.show{opacity:1;}
+  .readout b{font-weight:600; color:#fff;}
+  .readout .ro-item{display:flex; gap:5px; color:#aaa;}
+
+  .oi-tip{
+    position:fixed; z-index:50; font-size:12px;
+    background:rgba(20,20,22,0.96); color:#eee; border:1px solid rgba(255,255,255,0.14); border-radius:6px;
+    padding:7px 10px; pointer-events:none; opacity:0; transition:opacity 0.08s;
+    box-shadow:0 4px 16px rgba(0,0,0,0.35); white-space:nowrap;
+  }
+  .oi-tip.show{opacity:1;}
+  .oi-tip b{color:#fff;}
+
+  .footer{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; font-size:11px; color:var(--text-muted); padding-top:4px;}
+
+  @media (max-width:640px){
+    .tiles{grid-template-columns:repeat(2,1fr);}
+    .ticker h1{font-size:26px;}
+  }
+</style>
+
+<div class="oi-tip" id="oiTip"></div>
+
+<div class="wrap">
+
+  <div class="header">
+    <div class="ticker">
+      <h1 id="symTitle">NDX</h1>
+      <div class="segmented" role="group" aria-label="Symbol">
+        <button id="btnNDX" aria-pressed="true">NDX</button>
+        <button id="btnSPX" aria-pressed="false">SPX</button>
+        <button id="btnSPY" aria-pressed="false">SPY</button>
+        <button id="btnQQQ" aria-pressed="false">QQQ</button>
+      </div>
+      <span class="sub">Gamma-exposure desk for Nasdaq-100 / S&amp;P 500 index options (NDX/SPX) plus their ETF equivalents (QQQ/SPY). GEX per strike = gamma &times; open interest &times; multiplier, summed across calls+puts and across the current-day + next-day expirations. Heatmap intensity = |call GEX| + |put GEX| (concentration, not signed dealer positioning). Times shown in America/New York.</span>
+    </div>
+  </div>
+
+  <div class="banner" id="dataBanner">
+    <span>&#9888;</span>
+    <span><b>Open interest is reporting zero</b> for every strike on this symbol right now, which zeroes out the GEX calculation below (gamma alone can't produce a level). This was tested over a weekend; equity options (e.g. AAPL) show normal open interest at the same moment, so this looks specific to index options and may just be a data-refresh gap outside market hours. Re-run the fetch script during regular trading hours to check whether real levels appear.</span>
+  </div>
+
+  <div class="tiles">
+    <div class="tile">
+      <span class="label">Underlying last</span>
+      <span class="value" id="tileLast">&mdash;</span>
+      <span class="foot" id="tileAsOf">&mdash;</span>
+    </div>
+    <div class="tile">
+      <span class="label">Expiration shown</span>
+      <span class="value" id="tileExp">&mdash;</span>
+      <span class="foot" id="tileExpType">&mdash;</span>
+    </div>
+    <div class="tile">
+      <span class="label">Largest OI wall (this tab)</span>
+      <span class="value" id="tileTopStrike">&mdash;</span>
+      <span class="foot" id="tileTopActivity">&mdash;</span>
+    </div>
+    <div class="tile">
+      <span class="label">Call GEX / Put GEX (current+next day)</span>
+      <span class="value" id="tileVol">&mdash;</span>
+      <span class="foot" id="tileVolRatio">&mdash;</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Price against the gamma-exposure landscape</span>
+      <div class="segmented" role="group" aria-label="Timeframe">
+        <button id="btn1m" aria-pressed="true">1m</button>
+        <button id="btn5m" aria-pressed="false">5m</button>
+      </div>
+      <button id="btnSMC" class="reset-zoom-btn" aria-pressed="false" title="Experimental: order blocks, fair value gaps, and equal-high/low liquidity, detected from price action alone -- a different, unrelated technique from the options-based coloring above, included here so you can judge for yourself whether it adds anything">SMC overlay: off</button>
+      <button id="btnFutures" class="reset-zoom-btn" aria-pressed="false" hidden
+              title="Shows each price level's index-equivalent (QQQ/SPY scaled live off the actual index quote; NDX/SPX are already the index) PLUS the basis you enter below. Schwab doesn't serve live futures quotes on this account (confirmed: /NQU26 etc. all 404), so NQ/ES can't be computed directly -- enter the current futures-minus-index gap yourself from your own platform to correct for it. The basis is shared between an ETF and its index (QQQ and NDX both feed NQ; SPY and SPX both feed ES), so entering it once on either tab carries over to the other. Defaults to 0 (pure index-equivalent, no futures premium/discount applied) until you set it.">Futures axis: off</button>
+      <div id="futuresBasisControls" class="mode-controls" hidden>
+        <label>basis <input type="number" id="futuresBasisInput" value="0" step="1" style="width:64px;"></label>
+        <span style="color:var(--text-muted);font-size:11px;">pts (futures minus cash index, from your own platform -- changes slowly)</span>
+      </div>
+      <button id="btnResetZoom" class="reset-zoom-btn" title="Return the price axis to auto-fit">Reset zoom</button>
+    </div>
+    <div id="smcLegend" class="mode-controls" hidden style="margin-bottom:8px;">
+      <span style="color:#60a5fa;font-weight:600;">&#9632; Bullish FVG</span>
+      <span style="color:#f472b6;font-weight:600;">&#9632; Bearish FVG</span>
+      <span style="color:#2dd4bf;font-weight:600;">&#9632; Bullish OB</span>
+      <span style="color:#e879f9;font-weight:600;">&#9632; Bearish OB</span>
+      <span style="color:#cbd5e1;font-weight:600;">&#8213;&#8213; Equal high/low (liquidity)</span>
+      <span style="color:var(--text-muted); font-weight:400;">(faded = filled/invalidated)</span>
+    </div>
+    <div class="threshold-row">
+      <div class="segmented" role="group" aria-label="Heatmap mode for non-top-5 strikes">
+        <button id="btnHeatTiers" aria-pressed="true">Tiers</button>
+        <button id="btnHeatGradient" aria-pressed="false">Gradient</button>
+      </div>
+      <div id="tierControls" class="mode-controls">
+        <span>Red tiers (combined OI &ge;)</span>
+        <label>low <input type="number" id="tierLowInput" value="1000" step="100" min="0"></label>
+        <label>mid <input type="number" id="tierMidInput" value="2000" step="100" min="0"></label>
+        <label>high <input type="number" id="tierHighInput" value="3000" step="100" min="0"></label>
+      </div>
+      <div id="gradientControls" class="mode-controls" hidden>
+        <span>Gradient (top 8 by OI)</span>
+        <label>call <input type="color" id="gradientCallColorInput" value="#22c55e"></label>
+        <label>put <input type="color" id="gradientPutColorInput" value="#ef4444"></label>
+        <label>intensity <input type="range" id="gradientIntensityInput" min="0" max="100" value="70"></label>
+        <span id="gradientIntensityValue">70%</span>
+      </div>
+      <span id="levelCount"></span>
+      <div class="legend-swatches">
+        <span style="color:hsl(145,70%,32%);font-weight:600;">&#9632; #1</span>
+        <span style="color:hsl(28,92%,40%);font-weight:600;">&#9632; #2&ndash;3</span>
+        <span style="color:hsl(48,92%,38%);font-weight:600;">&#9632; #4&ndash;5</span>
+        <span style="color:#3b82f6;font-weight:600;">&#9473;&#9473; B = call/put within 10%</span>
+        <span>low</span><div class="legend-ramp" id="legendRamp"></div><span>high</span>
+      </div>
+    </div>
+    <div class="chart-shell" id="chartShell">
+      <canvas id="chart"></canvas>
+      <div class="readout" id="readout">
+        <span class="ro-item ro-t"><b id="roT">&mdash;</b></span>
+        <span class="ro-item">O<b id="roO">&mdash;</b></span>
+        <span class="ro-item">H<b id="roH">&mdash;</b></span>
+        <span class="ro-item">L<b id="roL">&mdash;</b></span>
+        <span class="ro-item">C<b id="roC">&mdash;</b></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Option chain<span class="exp-detail" id="chainExpDetail"></span></span>
+      <div class="exp-tabs" role="group" aria-label="Expiration">
+        <button id="tabCurrentDay" aria-pressed="true" data-exp="current_day">Current day</button>
+        <button id="tabNextDay" aria-pressed="false" data-exp="next_day">Next day</button>
+        <button id="tabCurrentMonth" aria-pressed="false" data-exp="current_month">Current month</button>
+      </div>
+    </div>
+    <div class="threshold-row">
+      <span>Min GEX to show (call or put &ge;)</span>
+      <label><input type="number" id="tableGexFloorInput" value="5000" step="100" min="0" style="width:90px;"></label>
+      <span>Min OI to show (call or put &ge;)</span>
+      <label><input type="number" id="tableOiFloorInput" value="0" step="100" min="0" style="width:90px;"></label>
+      <span id="tableRowCount" style="color:var(--text-muted); font-size:11px;"></span>
+    </div>
+    <div class="chain-wrap">
+      <div class="chain-scroll" id="chainScroll">
+        <table class="chain">
+          <thead>
+            <tr class="group-row">
+              <th colspan="7" style="text-align:center;color:var(--up);">Calls</th>
+              <th class="strike-col"></th>
+              <th colspan="7" style="text-align:center;color:var(--down);">Puts</th>
+            </tr>
+            <tr>
+              <th>GEX</th><th>Gamma</th><th>OI</th><th>Vol</th><th>Bid</th><th>Ask</th><th>Last</th>
+              <th class="strike-col">Strike</th>
+              <th>Last</th><th>Bid</th><th>Ask</th><th>Vol</th><th>OI</th><th>Gamma</th><th>GEX</th>
+            </tr>
+          </thead>
+          <tbody id="chainBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <details class="methodology-fold">
+    <summary>Chart &amp; option chain methodology &mdash; controls guide</summary>
+    <div class="methodology-cols">
+      <p class="methodology">Candles in America/New York time. Gridlines mark every real strike in view (not a rounded step, so nothing gets skipped), extended 5 strikes past the price range on each side. The 8 strikes with the highest <b>combined</b> call+put open interest for the expiration tab currently selected below &mdash; the same totals shown in that table &mdash; are the "most active levels": in <b>Tiers</b> mode the top 5 get a fixed full-height color (<b style="color:hsl(145,70%,32%)">green</b> = #1, <b style="color:hsl(28,92%,40%)">orange</b> = #2&ndash;#3, <b style="color:hsl(48,92%,38%)">yellow</b> = #4&ndash;#5) and everything else falls back to the plain red tiers (three fixed OI thresholds you set below); in <b>Gradient</b> mode every strike outside those 8 is left blank, and each of the 8 instead gets its own small color bump &mdash; call color or put color, whichever side leads, picked separately below &mdash; confined strictly between the midpoints to its neighboring strikes (so a level's color can never bleed into the next one) with the brightest 20% of that span sitting right on the strike and fading to nothing at its edges &mdash; brightness decays by OI rank, so #1 reads brightest. All 8 are labeled C, P, or <b style="color:#3b82f6">B</b> on the left for whichever side dominates that strike &mdash; B means call and put OI are within 10% of each other, which gets its own solid blue line through the band instead of being forced into a color that would misrepresent a roughly even split (Gradient mode blends the call/put colors for these; Tiers mode's band color is unaffected, since it's ranked by combined OI regardless of side). Hover a C/P/B badge for the exact call/put numbers and split, same as hovering a strike in the table below. The view widens automatically so all 8 are always on screen, even a round, mostly one-sided strike well outside today's price action. Switching the Current day / Next day / Current month tab below re-ranks the chart to match. <b>Drag the price scale on the right edge up/down to zoom in or out on price; drag anywhere else on the chart to pan both time and price</b> (double-click the price scale, or "Reset zoom", to return to auto-fit). "Futures axis" adds each level's futures-equivalent (NQ on QQQ/NDX, ES on SPY/SPX) next to the real price. On QQQ/SPY that's a live ratio against the actual index quote each refresh (QQQ and SPY track their index as a share-price fraction, not a point spread), then the basis you enter below; on NDX/SPX there's no ratio to apply (they already are the index), so it's just the basis. That basis has to be manual: Schwab's API returns no live futures quote at all on this account (NQ/ES quote and options endpoints both 404), so the futures-vs-cash-index premium can't be pulled automatically. It's shared between an ETF and its index &mdash; enter it once on QQQ or NDX and it applies to both, same for SPY/SPX &mdash; since it's the same real gap either way. Defaults to 0 (pure index-equivalent) until you set it from your own platform; it moves slowly (mainly with rates and days-to-expiration), so it shouldn't need updating often.</p>
+      <p class="methodology">A row shows only if it clears <b>both</b> floors below: call GEX or put GEX &ge; the GEX floor, <b>and</b> call OI or put OI &ge; the OI floor. GEX (gamma &times; open interest &times; multiplier) is about dealer hedging pressure; OI is the raw contract count behind it &mdash; lower either floor for a thin chain (NDX/SPX right now) that would otherwise show no rows. A strike that crosses a floor since your last look is outlined in red (kept only until you switch away and back, or reload) so a newly-significant level doesn't slip by unnoticed. The top 5 by combined OI &mdash; same ranking and colors as the chart &mdash; get a numbered <b style="color:#1baf7a">#1</b>/<b style="color:#eb6834">#2&ndash;3</b>/<b style="color:#eda100">#4&ndash;5</b> badge next to the strike, plus the matching row outline.</p>
+    </div>
+  </details>
+
+  <div class="footer">
+    <span>Source: Schwab Trader API (schwab-py) &middot; option chain (Greeks incl.) + 1-minute price history &middot; <span id="reloadCountdown"></span></span>
+    <span id="footGenerated"></span>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const DATA = __GEX_DATA__;
+  const SYMBOLS = Object.keys(DATA.symbols);
+
+  const els = {
+    symTitle: document.getElementById('symTitle'),
+    btnNDX: document.getElementById('btnNDX'),
+    btnSPX: document.getElementById('btnSPX'),
+    btnSPY: document.getElementById('btnSPY'),
+    btnQQQ: document.getElementById('btnQQQ'),
+    btn1m: document.getElementById('btn1m'),
+    btn5m: document.getElementById('btn5m'),
+    btnResetZoom: document.getElementById('btnResetZoom'),
+    btnSMC: document.getElementById('btnSMC'),
+    smcLegend: document.getElementById('smcLegend'),
+    btnFutures: document.getElementById('btnFutures'),
+    futuresBasisControls: document.getElementById('futuresBasisControls'),
+    futuresBasisInput: document.getElementById('futuresBasisInput'),
+    dataBanner: document.getElementById('dataBanner'),
+    tileLast: document.getElementById('tileLast'),
+    tileAsOf: document.getElementById('tileAsOf'),
+    tileExp: document.getElementById('tileExp'),
+    tileExpType: document.getElementById('tileExpType'),
+    tileTopStrike: document.getElementById('tileTopStrike'),
+    tileTopActivity: document.getElementById('tileTopActivity'),
+    tileVol: document.getElementById('tileVol'),
+    tileVolRatio: document.getElementById('tileVolRatio'),
+    chainExpDetail: document.getElementById('chainExpDetail'),
+    chainBody: document.getElementById('chainBody'),
+    oiTip: document.getElementById('oiTip'),
+    tabCurrentDay: document.getElementById('tabCurrentDay'),
+    tabNextDay: document.getElementById('tabNextDay'),
+    tabCurrentMonth: document.getElementById('tabCurrentMonth'),
+    tierLowInput: document.getElementById('tierLowInput'),
+    tierMidInput: document.getElementById('tierMidInput'),
+    tierHighInput: document.getElementById('tierHighInput'),
+    tableGexFloorInput: document.getElementById('tableGexFloorInput'),
+    tableOiFloorInput: document.getElementById('tableOiFloorInput'),
+    tableRowCount: document.getElementById('tableRowCount'),
+    levelCount: document.getElementById('levelCount'),
+    btnHeatTiers: document.getElementById('btnHeatTiers'),
+    btnHeatGradient: document.getElementById('btnHeatGradient'),
+    tierControls: document.getElementById('tierControls'),
+    gradientControls: document.getElementById('gradientControls'),
+    gradientCallColorInput: document.getElementById('gradientCallColorInput'),
+    gradientPutColorInput: document.getElementById('gradientPutColorInput'),
+    gradientIntensityInput: document.getElementById('gradientIntensityInput'),
+    gradientIntensityValue: document.getElementById('gradientIntensityValue'),
+    legendRamp: document.getElementById('legendRamp'),
+    chart: document.getElementById('chart'),
+    chartShell: document.getElementById('chartShell'),
+    readout: document.getElementById('readout'),
+    roT: document.getElementById('roT'), roO: document.getElementById('roO'),
+    roH: document.getElementById('roH'), roL: document.getElementById('roL'),
+    roC: document.getElementById('roC'),
+    footGenerated: document.getElementById('footGenerated'),
+    reloadCountdown: document.getElementById('reloadCountdown'),
+  };
+  const ctx = els.chart.getContext('2d');
+
+  const state = {
+    symbol: SYMBOLS[0],
+    exp: 'current_day',
+    tf: '1m',
+    tierLow: 1000,
+    tierMid: 2000,
+    tierHigh: 3000,
+    hoverIdx: -1,
+    hoverClientY: null, // raw mouse Y (page coords) while hovering the plot, for the price-axis crosshair tag
+    visibleStart: 0,
+    visibleCount: 180,
+    dragging: false, dragX: 0, dragStartVisible: 0,
+    // vertical (price-axis) zoom -- null means "auto-fit" (session range +
+    // padding + widened to keep the top-5 OI strikes on screen, as before).
+    // Dragging the right price-axis margin sets this, TradingView/NinjaTrader
+    // style, so price action stops getting squashed by a wide OI-driven range.
+    yRangeOverride: null,
+    yDragging: false, yDragStartY: 0, yDragAnchorPrice: 0, yDragStartRange: null,
+    // dragging *inside* the plot (not the axis margin) pans both axes at
+    // once, TradingView-style -- panStartRange is the vertical range in
+    // effect when the drag started
+    panStartY: 0, panStartRange: null,
+    // heatmap mode: 'tiers' is the original discrete green/orange/yellow
+    // top-5 + red 3-level dial system; 'gradient' instead gives each of the
+    // top-8-by-OI levels its own small, localized color bump (any hue you
+    // pick), confined to that strike's own half-spacing on each side
+    heatMode: 'tiers',
+    gradientCallColor: '#22c55e', // call-dominant levels
+    gradientPutColor: '#ef4444', // put-dominant levels; balanced ('B') levels blend the two
+    gradientIntensity: 70, // 0-100, like the old single dim/expose slider
+    // experimental price-action overlay (order blocks / FVG / liquidity) --
+    // off by default, unrelated to the options-based heatmap above
+    showSMC: false,
+    // QQQ/NDX->NQ and SPY/SPX->ES price-axis translation, off by default;
+    // shown wherever DATA.symbols[x].futuresProxy exists (QQQ, SPY, NDX,
+    // SPX -- see FUTURES_PROXY_FOR in schwab_gex_dashboard_data.py).
+    // futuresBasisByLabel is a manual, user-entered correction (points) per
+    // futures label ('NQ'/'ES') rather than per symbol, since it's the same
+    // real futures-vs-cash-index gap whether you got there via QQQ or NDX --
+    // entering it once on either tab carries over to the other. Has to be
+    // manual: Schwab's API has no live futures quote on this account to
+    // compute it automatically -- see toFutures().
+    showFutures: false,
+    futuresBasisByLabel: {},
+    // table GEX floor -- user-adjustable so a thin chain (NDX/SPX right now)
+    // isn't left with zero visible rows; 5000 matches the old hardcoded value
+    tableGexFloor: 5000,
+    tableOiFloor: 0,
+  };
+
+  function currentBars(){
+    const sym = currentSymbolData();
+    return state.tf === '5m' ? sym.priceBars5m : sym.priceBars1m;
+  }
+
+  const NY_TZ_PARTS = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false, hourCycle: 'h23',
+  });
+  function nyParts(t){
+    const parts = {};
+    for(const p of NY_TZ_PARTS.formatToParts(new Date(t))) parts[p.type] = p.value;
+    return parts;
+  }
+
+  function fmtInt(v){ return Math.round(v).toLocaleString(); }
+  // shared by the table's strike-cell tooltip and the chart's C/P/B badge
+  // tooltip, so both show the same real numbers plus the call/put split
+  function oiTooltipText(lvl){
+    if(!lvl) return 'No combined OI for this strike in this expiration';
+    const total = lvl.callOi + lvl.putOi;
+    const callPct = total > 0 ? (lvl.callOi/total*100) : 0;
+    return `Combined OI: ${fmtInt(lvl.oi)} = ${fmtInt(lvl.callOi)} call + ${fmtInt(lvl.putOi)} put  |  `
+         + `C:P = ${callPct.toFixed(0)}% : ${(100-callPct).toFixed(0)}%`;
+  }
+  function fmtGex(v){
+    const av = Math.abs(v);
+    if(av >= 1e6) return (v/1e6).toFixed(2) + 'M';
+    if(av >= 1e3) return (v/1e3).toFixed(1) + 'K';
+    return v.toFixed(1);
+  }
+  function fmtTime(t){
+    const p = nyParts(t);
+    return `${p.month}/${p.day} ${p.hour}:${p.minute}`;
+  }
+
+  function currentSymbolData(){ return DATA.symbols[state.symbol]; }
+  // {label:'NQ'|'ES', ratio} if this symbol has a live futures-proxy ratio
+  // attached (QQQ, SPY, NDX, SPX -- see FUTURES_PROXY_FOR in
+  // schwab_gex_dashboard_data.py; NDX/SPX get ratio 1.0, since they're
+  // already the cash index -- only the manual basis applies to them)
+  function currentFuturesProxy(){ return currentSymbolData().futuresProxy || null; }
+  // current futures label's manual basis (0 if never entered)
+  function currentFuturesBasis(){
+    const fp = currentFuturesProxy();
+    return fp ? (state.futuresBasisByLabel[fp.label] || 0) : 0;
+  }
+  // index-equivalent (live ratio) + the manual basis you enter, since
+  // Schwab's API has no live futures quote on this account (confirmed:
+  // NQ/ES quote endpoints all 404) to compute the real basis automatically
+  function toFutures(price){
+    const fp = currentFuturesProxy();
+    return fp ? price * fp.ratio + currentFuturesBasis() : null;
+  }
+  function currentExpData(){ return currentSymbolData().expirations[state.exp]; }
+  // OI levels for whichever expiration tab is currently selected -- kept
+  // per-expiration (not summed across current+next day) so the chart's
+  // top-ranked strikes always match the OI numbers sitting in the visible
+  // table for that same tab.
+  function currentOiLevels(){ return currentSymbolData().oiLevelsByExp[state.exp] || []; }
+
+  // ---------- option chain table ----------
+  function renderChain(){
+    const sym = currentSymbolData();
+    const exp = currentExpData();
+    els.chainBody.textContent = '';
+    if(!exp){
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 15; td.style.textAlign = 'center'; td.style.padding = '20px';
+      td.textContent = 'No matching expiration found for this bucket.';
+      tr.appendChild(td);
+      els.chainBody.appendChild(tr);
+      els.chainExpDetail.textContent = '';
+      els.tableRowCount.textContent = '';
+      return;
+    }
+    els.chainExpDetail.textContent = `${exp.date} · ${exp.daysToExpiration}d out · type ${exp.expirationType}`;
+
+    const callByStrike = new Map(exp.calls.map(r => [r.strike, r]));
+    const putByStrike = new Map(exp.puts.map(r => [r.strike, r]));
+    // combined call+put OI per strike for THIS expiration -- the same number
+    // the heatmap ranks by -- so hovering the strike shows why it's colored
+    // the way it is, without doing call-OI + put-OI arithmetic by hand.
+    const oiLevelsHere = currentOiLevels();
+    const combinedOiByStrike = new Map(oiLevelsHere.map(l => [l.strike, l]));
+    // same top-5-by-combined-OI ranking the chart uses, so a row's outline
+    // color always matches whatever band that strike shows as on the chart
+    const specialMap = specialByStrike(oiLevelsHere);
+    const TIER_HUE_TO_CLASS = { 145: 'tier-green', 28: 'tier-orange', 48: 'tier-yellow' };
+    function bestTierClass(strike){
+      const special = specialMap.get(strike);
+      return special ? TIER_HUE_TO_CLASS[special.tier.hue] : null;
+    }
+    const allStrikes = Array.from(new Set([...callByStrike.keys(), ...putByStrike.keys()])).sort((a,b)=>a-b);
+    const underlying = sym.underlyingPrice;
+    let atmStrike = allStrikes[0], atmDist = Infinity;
+    for(const s of allStrikes){ const d = Math.abs(s - underlying); if(d < atmDist){ atmDist = d; atmStrike = s; } }
+
+    // Rows below this on both sides are noise at a glance -- hide them, but
+    // remember what was shown so a strike that later crosses the floor can
+    // be flagged NEW rather than just quietly appearing.
+    const GEX_MIN_TABLE = state.tableGexFloor;
+    const OI_MIN_TABLE = state.tableOiFloor;
+    const seenKey = `gexSeenStrikes::${state.symbol}::${state.exp}`;
+    let seenBefore = null;
+    try{
+      const raw = localStorage.getItem(seenKey);
+      if(raw !== null) seenBefore = new Set(JSON.parse(raw));
+    }catch(e){}
+    const visibleStrikesNow = [];
+
+    const frag = document.createDocumentFragment();
+    let atmRow = null;
+    for(const strike of allStrikes){
+      const c = callByStrike.get(strike);
+      const p = putByStrike.get(strike);
+      const cGex = c ? c.gamma * c.openInterest * c.multiplier : 0;
+      const pGex = p ? p.gamma * p.openInterest * p.multiplier : 0;
+      const cOi = c ? c.openInterest : 0;
+      const pOi = p ? p.openInterest : 0;
+      if(Math.abs(cGex) < GEX_MIN_TABLE && Math.abs(pGex) < GEX_MIN_TABLE) continue;
+      if(cOi < OI_MIN_TABLE && pOi < OI_MIN_TABLE) continue;
+      visibleStrikesNow.push(strike);
+
+      const tr = document.createElement('tr');
+      if(c && c.inTheMoney) tr.classList.add('calls-itm');
+      if(p && p.inTheMoney) tr.classList.add('puts-itm');
+      if(strike === atmStrike) { tr.classList.add('atm-row'); atmRow = tr; }
+      const tierClass = bestTierClass(strike);
+      if(tierClass) tr.classList.add(tierClass);
+      if(seenBefore && !seenBefore.has(strike)) tr.classList.add('new-row');
+
+      const cells = [
+        [c ? fmtGex(cGex) : '–', 'call-cell gamma-cell'],
+        [c ? c.gamma.toFixed(4) : '–', 'call-cell gamma-cell'],
+        [c ? fmtInt(c.openInterest) : '–', 'call-cell'],
+        [c ? fmtInt(c.volume) : '–', 'call-cell vol-cell'],
+        [c ? c.bid.toFixed(2) : '–', 'call-cell'],
+        [c ? c.ask.toFixed(2) : '–', 'call-cell'],
+        [c ? c.last.toFixed(2) : '–', 'call-cell'],
+        [strike.toFixed(2), 'strike-cell'],
+        [p ? p.last.toFixed(2) : '–', 'put-cell'],
+        [p ? p.bid.toFixed(2) : '–', 'put-cell'],
+        [p ? p.ask.toFixed(2) : '–', 'put-cell'],
+        [p ? fmtInt(p.volume) : '–', 'put-cell vol-cell'],
+        [p ? fmtInt(p.openInterest) : '–', 'put-cell'],
+        [p ? p.gamma.toFixed(4) : '–', 'put-cell gamma-cell'],
+        [p ? fmtGex(pGex) : '–', 'put-cell gamma-cell'],
+      ];
+      cells.forEach(([val, cls]) => {
+        const td = document.createElement('td');
+        if(cls) cls.split(' ').forEach(c2 => td.classList.add(c2));
+        if(cls === 'strike-cell'){
+          // explicit #1/#2-3/#4-5 rank badge, in the same color as the row
+          // outline, so the ranking is legible as text -- not just inferable
+          // from the outline color alone
+          const special = specialMap.get(strike);
+          if(special){
+            const rankColor = special.tier.hue === 145 ? '#1baf7a' : special.tier.hue === 28 ? '#eb6834' : '#eda100';
+            const badge = document.createElement('span');
+            badge.textContent = '#' + (special.rank + 1);
+            badge.style.cssText = `color:${rankColor}; font-weight:700; font-size:10px; margin-right:4px;`;
+            td.appendChild(badge);
+          }
+          td.appendChild(document.createTextNode(val));
+          const lvl = combinedOiByStrike.get(strike);
+          const text = oiTooltipText(lvl);
+          td.addEventListener('mouseenter', () => { els.oiTip.textContent = text; els.oiTip.classList.add('show'); });
+          td.addEventListener('mousemove', (ev) => {
+            els.oiTip.style.left = (ev.clientX + 14) + 'px';
+            els.oiTip.style.top = (ev.clientY + 14) + 'px';
+          });
+          td.addEventListener('mouseleave', () => { els.oiTip.classList.remove('show'); });
+        } else {
+          td.textContent = val;
+        }
+        tr.appendChild(td);
+      });
+      frag.appendChild(tr);
+    }
+
+    if(frag.children.length === 0){
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 15; td.style.textAlign = 'center'; td.style.padding = '20px';
+      td.textContent = `No strikes clear the ${fmtGex(GEX_MIN_TABLE)} GEX floor for this expiration.`;
+      tr.appendChild(td);
+      frag.appendChild(tr);
+    }
+
+    try{ localStorage.setItem(seenKey, JSON.stringify(visibleStrikesNow)); }catch(e){}
+    els.tableRowCount.textContent = `(${visibleStrikesNow.length} of ${allStrikes.length} strikes shown)`;
+
+    els.chainBody.appendChild(frag);
+    if(atmRow){ requestAnimationFrame(() => atmRow.scrollIntoView({block:'center'})); }
+  }
+
+  // ---------- stat tiles ----------
+  function updateTiles(){
+    const sym = currentSymbolData();
+    const exp = currentExpData();
+    els.tileLast.textContent = sym.underlyingPrice.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    const fp = currentFuturesProxy();
+    els.tileAsOf.textContent = fp
+      ? `${state.symbol} · ${fp.label}≈${toFutures(sym.underlyingPrice).toLocaleString(undefined,{maximumFractionDigits:0})}`
+      : state.symbol;
+
+    const oiLevels = currentOiLevels();
+    const allZero = oiLevels.length > 0 && oiLevels.every(l => l.oi === 0);
+    els.dataBanner.classList.toggle('show', allZero);
+
+    const topOi = (!allZero && oiLevels.length) ? oiLevels[0] : null;
+    els.tileTopStrike.textContent = topOi ? topOi.strike.toFixed(0) : '—';
+    els.tileTopActivity.textContent = topOi
+      ? `${fmtInt(topOi.oi)} total = ${fmtInt(topOi.callOi)} call + ${fmtInt(topOi.putOi)} put`
+      : (allZero ? 'no signal (OI = 0)' : '—');
+
+    if(exp){
+      els.tileExp.textContent = exp.date;
+      els.tileExpType.textContent = (exp.expirationType === 'S' ? 'Standard/monthly' : 'Weekly') + ` · ${exp.daysToExpiration}d`;
+    } else {
+      els.tileExp.textContent = '—'; els.tileExpType.textContent = '—';
+    }
+
+    const levels = sym.levels;
+    const totalCallGex = levels.reduce((a,l)=>a+l.callGEX,0);
+    const totalPutGex = levels.reduce((a,l)=>a+l.putGEX,0);
+    els.tileVol.textContent = fmtGex(totalCallGex) + ' / ' + fmtGex(totalPutGex);
+    els.tileVolRatio.textContent = 'current-day + next-day combined';
+  }
+
+  // ---------- levels: discrete OI tiers (not a smooth gradient) ----------
+  // Ranked by raw open interest, not GEX -- see the file header comment in
+  // schwab_gex_dashboard_data.py for why (gamma varies by strike, so GEX can
+  // rank a lower-OI strike above a higher-OI one). Three fixed, user-editable
+  // tiers so relative strength reads at a glance rather than needing to
+  // compare subtle shades: below tierLow a strike isn't drawn at all; each
+  // tier up is both redder and thicker.
+  function tierFor(oi){
+    if(oi < state.tierLow) return null;
+    if(oi >= state.tierHigh) return { alpha: 0.85, thicknessFrac: 1.0 };
+    if(oi >= state.tierMid)  return { alpha: 0.55, thicknessFrac: 0.65 };
+    return { alpha: 0.26, thicknessFrac: 0.4 };
+  }
+
+  // ---------- alternative to the tiers above: instead of a discrete
+  // green/orange/yellow/red band per strike, each of the top-8 "most active"
+  // levels gets its own small, localized gradient bump (any color you pick),
+  // confined strictly between the midpoints to its neighboring real strikes
+  // -- see the heatmap loop in draw() for the actual per-level shape.
+  function hexToRgbTuple(hex){
+    const h = (hex || '#8b5cf6').replace('#','');
+    return [parseInt(h.substring(0,2),16), parseInt(h.substring(2,4),16), parseInt(h.substring(4,6),16)];
+  }
+  function hexToRgba(hex, alpha){
+    const [r,g,b] = hexToRgbTuple(hex);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  function blendHex(hexA, hexB){
+    const a = hexToRgbTuple(hexA), b = hexToRgbTuple(hexB);
+    return '#' + a.map((v,i) => Math.round((v+b[i])/2).toString(16).padStart(2,'0')).join('');
+  }
+  // A strike's call/put OI split, reduced to one letter: 'C' or 'P' when one
+  // side clearly leads, or 'B' (balanced) when they're within 10% of each
+  // other -- a near-even strike is just as worth flagging as a lopsided one,
+  // so it gets its own label rather than being forced into C or P by
+  // whichever side happens to be a handful of contracts ahead.
+  function sideLabel(callOi, putOi){
+    const hi = Math.max(callOi, putOi), lo = Math.min(callOi, putOi);
+    if(hi > 0 && lo/hi >= 0.9) return 'B';
+    return callOi >= putOi ? 'C' : 'P';
+  }
+
+  // Top 5 strikes by COMBINED (call+put) OI -- the same number shown
+  // everywhere else and the one you'd naturally compare by eye -- get their
+  // own fixed colors instead of the red ramp: rank 0 = green, ranks 1-2 =
+  // orange, ranks 3-4 = yellow. (Earlier this ranked calls and puts on two
+  // separate ladders, so a strike could out-rank a higher-combined-OI strike
+  // just by leading its own side narrowly -- confusing when compared against
+  // the combined total everywhere else, so this was switched to one ladder.)
+  // Strikes outside the top 5 fall back to the plain combined-OI red tiers.
+  const SPECIAL_TIERS = [
+    { hue: 145, sat: 70, light: 40, alpha: 0.78 }, // rank 0 -- green
+    { hue: 28,  sat: 92, light: 50, alpha: 0.72 }, // ranks 1-2 -- orange
+    { hue: 28,  sat: 92, light: 50, alpha: 0.72 },
+    { hue: 48,  sat: 92, light: 55, alpha: 0.68 }, // ranks 3-4 -- yellow
+    { hue: 48,  sat: 92, light: 55, alpha: 0.68 },
+  ];
+  function specialTierForRank(rank){
+    return rank < SPECIAL_TIERS.length ? SPECIAL_TIERS[rank] : null;
+  }
+  // oiLevels is already sorted desc by combined oi (see combine_oi_levels()
+  // in schwab_gex_dashboard_data.py) -- the first 5 entries are the top 5.
+  // Each carries which side dominates (or 'B' if roughly balanced), for the
+  // C/P/B label.
+  function specialByStrike(oiLevels){
+    const m = new Map();
+    oiLevels.slice(0, SPECIAL_TIERS.length).forEach((l, rank) => {
+      m.set(l.strike, { tier: specialTierForRank(rank), dominant: sideLabel(l.callOi, l.putOi), rank });
+    });
+    return m;
+  }
+
+  // ---------- experimental: Smart Money Concepts (SMC) price-action overlay
+  // ----------------------------------------------------------------------
+  // A different, unrelated technique from everything above: no options data,
+  // just candlestick geometry (order blocks, fair value gaps, equal
+  // high/low liquidity), included purely so you can judge whether it adds
+  // anything next to the OI/GEX view. All indices below are into the FULL
+  // currentBars() array (bar = [time, open, high, low, close, volume]), not
+  // the visible slice -- draw() converts to screen X.
+  let smcCache = {}; // keyed by `${symbol}::${tf}` so it isn't recomputed on every hover-triggered draw()
+
+  function findSwings(bars, lookback){
+    const highs = [], lows = [];
+    for(let i=lookback;i<bars.length-lookback;i++){
+      const h = bars[i][2], l = bars[i][3];
+      let isHigh = true, isLow = true;
+      for(let k=1;k<=lookback && (isHigh||isLow);k++){
+        if(bars[i-k][2]>h || bars[i+k][2]>h) isHigh = false;
+        if(bars[i-k][3]<l || bars[i+k][3]<l) isLow = false;
+      }
+      if(isHigh) highs.push({idx:i, price:h});
+      if(isLow) lows.push({idx:i, price:l});
+    }
+    return { highs, lows };
+  }
+
+  // 3-candle Fair Value Gap: a gap left between candle i-1 and i+1 that the
+  // middle candle's range doesn't cover. "Filled" the first time price
+  // later trades back into the gap.
+  function findFVGs(bars){
+    const fvgs = [];
+    for(let i=1;i<bars.length-1;i++){
+      const prevHigh = bars[i-1][2], prevLow = bars[i-1][3];
+      const nextHigh = bars[i+1][2], nextLow = bars[i+1][3];
+      if(nextLow > prevHigh){
+        fvgs.push({ startIdx: i-1, dir: 'bull', top: nextLow, bottom: prevHigh, fillIdx: null });
+      } else if(nextHigh < prevLow){
+        fvgs.push({ startIdx: i-1, dir: 'bear', top: prevLow, bottom: nextHigh, fillIdx: null });
+      }
+    }
+    for(const g of fvgs){
+      for(let j=g.startIdx+2;j<bars.length;j++){
+        if(g.dir==='bull' && bars[j][3] <= g.bottom){ g.fillIdx = j; break; }
+        if(g.dir==='bear' && bars[j][2] >= g.top){ g.fillIdx = j; break; }
+      }
+    }
+    return fvgs;
+  }
+
+  // Order block: the last opposite-colored candle before a break of a prior
+  // swing high/low. Bullish OB invalidated once a later close trades back
+  // below it; bearish OB invalidated once a later close trades back above it.
+  function findOrderBlocks(bars, swings){
+    const obs = [];
+    let lastHighIdx=-1, lastHighPrice=Infinity, lastLowIdx=-1, lastLowPrice=-Infinity;
+    let hI=0, lI=0;
+    for(let i=0;i<bars.length;i++){
+      while(hI<swings.highs.length && swings.highs[hI].idx<i){ lastHighIdx=swings.highs[hI].idx; lastHighPrice=swings.highs[hI].price; hI++; }
+      while(lI<swings.lows.length && swings.lows[lI].idx<i){ lastLowIdx=swings.lows[lI].idx; lastLowPrice=swings.lows[lI].price; lI++; }
+      const close = bars[i][4];
+      if(lastHighIdx>=0 && close>lastHighPrice){
+        for(let k=i-1;k>Math.max(lastHighIdx-5,0);k--){
+          if(bars[k][4] < bars[k][1]){ obs.push({ idx:k, dir:'bull', top:bars[k][2], bottom:bars[k][3], brokeAt:i, invalidIdx:null }); break; }
+        }
+        lastHighPrice = Infinity; // consumed -- don't re-trigger until a newer swing high forms
+      }
+      if(lastLowIdx>=0 && close<lastLowPrice){
+        for(let k=i-1;k>Math.max(lastLowIdx-5,0);k--){
+          if(bars[k][4] > bars[k][1]){ obs.push({ idx:k, dir:'bear', top:bars[k][2], bottom:bars[k][3], brokeAt:i, invalidIdx:null }); break; }
+        }
+        lastLowPrice = -Infinity;
+      }
+    }
+    for(const ob of obs){
+      for(let j=ob.brokeAt+1;j<bars.length;j++){
+        if(ob.dir==='bull' && bars[j][4] < ob.bottom){ ob.invalidIdx = j; break; }
+        if(ob.dir==='bear' && bars[j][4] > ob.top){ ob.invalidIdx = j; break; }
+      }
+    }
+    return obs;
+  }
+
+  // Equal highs/lows within a small % tolerance of each other -- read as
+  // resting liquidity in ICT terms.
+  function findLiquidity(bars, swings, tolerancePct){
+    const pools = [];
+    function cluster(points, kind){
+      const used = new Array(points.length).fill(false);
+      for(let i=0;i<points.length;i++){
+        if(used[i]) continue;
+        const group = [points[i]]; used[i] = true;
+        for(let j=i+1;j<points.length;j++){
+          if(used[j]) continue;
+          if(Math.abs(points[j].price-points[i].price)/points[i].price*100 <= tolerancePct){ group.push(points[j]); used[j]=true; }
+        }
+        if(group.length>=2){
+          pools.push({
+            kind,
+            price: group.reduce((a,p)=>a+p.price,0)/group.length,
+            startIdx: Math.min(...group.map(p=>p.idx)),
+            lastIdx: Math.max(...group.map(p=>p.idx)),
+          });
+        }
+      }
+    }
+    cluster(swings.highs, 'high');
+    cluster(swings.lows, 'low');
+    return pools;
+  }
+
+  function computeSMC(bars){
+    const swings = findSwings(bars, 5);
+    return {
+      fvgs: findFVGs(bars),
+      obs: findOrderBlocks(bars, swings),
+      liquidity: findLiquidity(bars, swings, 0.05),
+    };
+  }
+
+  function getSMC(){
+    const key = `${state.symbol}::${state.tf}`;
+    if(!smcCache[key]) smcCache[key] = computeSMC(currentBars());
+    return smcCache[key];
+  }
+
+  // ---------- chart ----------
+  const PAD_TOP = 10, PAD_BOTTOM = 22, PAD_RIGHT_BASE = 66, PAD_RIGHT_FUTURES = 66 + 74, PAD_LEFT = 8;
+  // wider right margin when the futures-equivalent column is showing
+  function padRight(){ return (state.showFutures && currentFuturesProxy()) ? PAD_RIGHT_FUTURES : PAD_RIGHT_BASE; }
+  // last vertical range + plot geometry drawn, so the axis-drag handlers
+  // (outside draw(), see setupYAxisDrag()) can convert a mouse Y into a price
+  let lastRange = null;
+  // left-edge C/P/B badge bounding boxes from the last draw(), so a plain
+  // mousemove (outside draw()) can hit-test the cursor against them for the
+  // hover tooltip -- see updateChartLabelTooltip() below
+  let chartLabelHitRects = [];
+  let lastOiByStrike = new Map();
+
+  function getGeom(){
+    const w = els.chart.clientWidth, h = els.chart.clientHeight;
+    return { w, h, plotW: w - PAD_LEFT - padRight(), plotTop: PAD_TOP, plotBottom: h - PAD_BOTTOM };
+  }
+
+  function resizeCanvas(){
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const shellW = els.chartShell.clientWidth;
+    const chartH = 620;
+    els.chart.style.height = chartH + 'px';
+    els.chart.width = Math.round(shellW * dpr);
+    els.chart.height = Math.round(chartH * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    draw();
+  }
+
+  function visibleBars(){
+    const bars = currentBars();
+    const s = Math.max(0, Math.min(state.visibleStart, bars.length - 1));
+    const e = Math.min(bars.length, s + state.visibleCount);
+    return { s, e, bars: bars.slice(s, e) };
+  }
+
+
+  function draw(){
+    const g = getGeom();
+    ctx.clearRect(0,0,g.w,g.h);
+    ctx.fillStyle = `rgb(var(--chart-bg))`.replace('var(--chart-bg)', getComputedStyle(document.documentElement).getPropertyValue('--chart-bg'));
+    ctx.fillRect(0,0,g.w,g.h);
+
+    const { s, e, bars } = visibleBars();
+    if(bars.length === 0) return;
+
+    const oiLevels = currentOiLevels();
+    // top-5-by-combined-OI strikes, computed before the view range so the
+    // range below can be widened to guarantee every one of them is actually
+    // on screen -- a green/orange/yellow band that scrolled off the edge
+    // used to look like a *lower*-OI strike had unfairly out-ranked a
+    // higher one sitting right there in the table, when really the true
+    // top-5 strike was just off-chart the whole time (e.g. a round, mostly
+    // one-sided strike well outside the session's price range).
+    const special = specialByStrike(oiLevels);
+    const sortedAllStrikes = [...new Set(oiLevels.map(l=>l.strike))].sort((a,b)=>a-b);
+    // quick strike -> {strike,callOi,putOi,oi} lookup, for tooltips and for
+    // re-deriving C/P/B without re-scanning oiLevels every time
+    const oiByStrike = new Map(oiLevels.map(l => [l.strike, l]));
+    lastOiByStrike = oiByStrike; // for the chart-badge hover tooltip, outside draw()
+    // top 8 by combined OI -- the "most active levels" -- drives the left
+    // C/P/B labels in both modes, and drives the per-level gradient bumps in
+    // Gradient mode (see the heatmap loop below). Computed up here so the
+    // auto-fit range can also guarantee these are on screen, same reasoning
+    // as the top-5 `special` strikes above.
+    const LABEL_TOP_N = 8;
+    const labelSet = new Map(oiLevels.slice(0, LABEL_TOP_N).map(l => [l.strike, sideLabel(l.callOi, l.putOi)]));
+
+    // Vertical range: auto-fit by default (session range + padding, widened
+    // to keep the top-8 OI levels on screen), OR whatever the user set by
+    // dragging the right price-axis margin -- see setupYAxisDrag() below.
+    let pMin, pMax;
+    if(state.yRangeOverride){
+      pMin = state.yRangeOverride.pMin; pMax = state.yRangeOverride.pMax;
+    } else {
+      pMin = Infinity; pMax = -Infinity;
+      for(const b of bars){ if(b[3]<pMin) pMin=b[3]; if(b[2]>pMax) pMax=b[2]; }
+      // widen the view a bit so nearby levels above/below the session's range still show
+      const sessionSpan = pMax - pMin || 1;
+      pMin -= sessionSpan*0.35; pMax += sessionSpan*0.35;
+      // force every top-8 strike into view, even if it's well outside the
+      // session's price action
+      for(const strike of labelSet.keys()){
+        if(strike < pMin) pMin = strike;
+        if(strike > pMax) pMax = strike;
+      }
+      // then stretch further to include 5 more *real* strikes on each side
+      // (10 more levels total) beyond whatever that padding already covers
+      const EXTRA_LEVELS_EACH_SIDE = 5;
+      const above = sortedAllStrikes.filter(s => s > pMax);
+      const below = sortedAllStrikes.filter(s => s < pMin).reverse();
+      if(above.length) pMax = above[Math.min(EXTRA_LEVELS_EACH_SIDE, above.length) - 1];
+      if(below.length) pMin = below[Math.min(EXTRA_LEVELS_EACH_SIDE, below.length) - 1];
+    }
+    // remember the range + geometry so axis-drag interaction (outside draw())
+    // can convert a mouse Y back into a price without recomputing all of this
+    lastRange = { pMin, pMax, plotTop: g.plotTop, plotBottom: g.plotBottom };
+
+    const n = bars.length;
+    const slot = g.plotW / n;
+
+    function xAt(i){ return PAD_LEFT + slot*(i+0.5); }
+    function yPrice(v){ return g.plotTop + (g.plotBottom-g.plotTop) * (1 - (v-pMin)/(pMax-pMin)); }
+
+    // SMC overlay prep (used both before candles -- FVG/OB zones -- and
+    // after candles -- liquidity lines, see below)
+    const smc = state.showSMC ? getSMC() : null;
+    const smcFullLen = smc ? currentBars().length : 0;
+    function xAbsEdge(absIdx, side){
+      const rel = absIdx - s;
+      if(rel < 0) return PAD_LEFT;
+      if(rel >= n) return PAD_LEFT + g.plotW;
+      return xAt(rel) + (side==='left' ? -slot/2 : slot/2);
+    }
+
+    // ---- heatmap bands (drawn first, behind everything) ----
+    // Tiers mode: top 5 by combined OI get a full-height green/orange/yellow
+    // band (specialByStrike()); everything else falls back to the plain
+    // combined-OI red tiers (tierFor()). Gradient mode: no flat bands at
+    // all -- see below.
+    const leftLabels = []; // collected here, drawn after gridlines so they sit on top
+
+    function clampY(y){ return Math.max(g.plotTop, Math.min(g.plotBottom, y)); }
+
+    if(oiLevels.length > 1){
+      const sortedStrikes = oiLevels.map(l=>l.strike).sort((a,b)=>a-b);
+      const heatHue = getComputedStyle(document.documentElement).getPropertyValue('--heat-hue');
+
+      if(state.heatMode === 'gradient'){
+        // Only the top 8 "most active" levels get anything drawn. Each gets
+        // its own small, self-contained gradient bump strictly between the
+        // midpoints to its neighboring real strikes (e.g. for $1-wide SPY
+        // strikes, the 760 bump spans exactly 759.5-760.5) so it can never
+        // bleed into a neighboring level's territory -- unlike a single
+        // chart-wide peak, which put the "hot" spot wherever the single
+        // highest-GEX strike happened to be, even if that wasn't one of the
+        // levels that actually matter. Peak intensity sits in the central
+        // 20% of that span, fading to zero by the edges. Brightness decays
+        // by OI rank so #1 reads brightest.
+        const topLevels = oiLevels.slice(0, LABEL_TOP_N);
+        const CORE_HALF_WIDTH = 0.10; // +-10% of the span = 20% at full intensity
+        topLevels.forEach((lvl, rank) => {
+          if(lvl.strike < pMin || lvl.strike > pMax) return;
+          const idx = sortedStrikes.indexOf(lvl.strike);
+          const prev = sortedStrikes[idx-1], next = sortedStrikes[idx+1];
+          const halfBelow = prev !== undefined ? (lvl.strike-prev)/2 : (next!==undefined ? (next-lvl.strike)/2 : 5);
+          const halfAbove = next !== undefined ? (next-lvl.strike)/2 : halfBelow;
+          const yLo = clampY(yPrice(lvl.strike + halfAbove));
+          const yHi = clampY(yPrice(lvl.strike - halfBelow));
+          const top = Math.min(yLo, yHi), bot = Math.max(yLo, yHi);
+          const h = bot - top;
+          if(h <= 0.5) return;
+          const peak = (state.gradientIntensity/100) * (1 - (rank / Math.max(1, LABEL_TOP_N-1)) * 0.7);
+          const centerY = Math.max(top, Math.min(bot, yPrice(lvl.strike)));
+          const centerFrac = (centerY - top) / h;
+          const lbl = sideLabel(lvl.callOi, lvl.putOi);
+          // balanced strikes don't honestly belong to either color, so blend
+          // them rather than arbitrarily picking a side
+          const baseColor = lbl === 'C' ? state.gradientCallColor
+                           : lbl === 'P' ? state.gradientPutColor
+                           : blendHex(state.gradientCallColor, state.gradientPutColor);
+          const bandGrad = ctx.createLinearGradient(0, top, 0, bot);
+          let lastOffset = -1;
+          for(const [off, a] of [[0,0], [centerFrac-CORE_HALF_WIDTH, peak], [centerFrac+CORE_HALF_WIDTH, peak], [1,0]]){
+            const o = Math.max(lastOffset, Math.min(1, Math.max(0, off)));
+            bandGrad.addColorStop(o, hexToRgba(baseColor, a));
+            lastOffset = o;
+          }
+          ctx.fillStyle = bandGrad;
+          ctx.fillRect(PAD_LEFT, top, g.plotW, h);
+          leftLabels.push({ y: centerY, text: lbl, strike: lvl.strike });
+        });
+      } else {
+        // local half-spacing per strike so bands tile without gaps or overlap
+        for(let k=0;k<oiLevels.length;k++){
+          const lvl = oiLevels[k];
+          // strictly within the visible range -- not just "nearby" -- so
+          // multiple off-screen strikes never collapse onto the same clamped
+          // edge pixel and blend into an unreadable smear
+          if(lvl.strike < pMin || lvl.strike > pMax) continue;
+          const idx = sortedStrikes.indexOf(lvl.strike);
+          const prev = sortedStrikes[idx-1], next = sortedStrikes[idx+1];
+          const halfBelow = prev !== undefined ? (lvl.strike-prev)/2 : (next!==undefined ? (next-lvl.strike)/2 : 5);
+          const halfAbove = next !== undefined ? (next-lvl.strike)/2 : halfBelow;
+
+          const sp = special.get(lvl.strike);
+          if(sp){
+            const yTop = clampY(yPrice(lvl.strike + halfAbove));
+            const yBot = clampY(yPrice(lvl.strike - halfBelow));
+            const h = Math.abs(yBot-yTop);
+            if(h > 0.5){
+              ctx.fillStyle = `hsla(${sp.tier.hue}, ${sp.tier.sat}%, ${sp.tier.light}%, ${sp.tier.alpha})`;
+              ctx.fillRect(PAD_LEFT, Math.min(yTop,yBot), g.plotW, h);
+              leftLabels.push({ y: (yTop+yBot)/2, text: sp.dominant, strike: lvl.strike });
+            }
+          } else {
+            const tier = tierFor(lvl.oi);
+            if(!tier){
+              // still label it if it's a top-8 strike, even below the tier floor
+              if(labelSet.has(lvl.strike)){
+                const yTop = clampY(yPrice(lvl.strike + halfAbove));
+                const yBot = clampY(yPrice(lvl.strike - halfBelow));
+                leftLabels.push({ y: (yTop+yBot)/2, text: labelSet.get(lvl.strike), strike: lvl.strike });
+              }
+              continue;
+            }
+            const yTop = clampY(yPrice(lvl.strike + halfAbove * tier.thicknessFrac));
+            const yBot = clampY(yPrice(lvl.strike - halfBelow * tier.thicknessFrac));
+            const h = Math.abs(yBot-yTop);
+            if(h <= 0.5) continue;
+            const light = 40 + 20*tier.thicknessFrac;
+            ctx.fillStyle = `hsla(${heatHue}, 90%, ${light}%, ${tier.alpha})`;
+            ctx.fillRect(PAD_LEFT, Math.min(yTop,yBot), g.plotW, h);
+            if(labelSet.has(lvl.strike)) leftLabels.push({ y: (yTop+yBot)/2, text: labelSet.get(lvl.strike), strike: lvl.strike });
+          }
+        }
+      }
+    }
+
+    // gridlines + price axis labels -- one per *real* strike in view, not an
+    // arithmetic step, so nothing gets skipped just because it fell on an
+    // "unround" number (this is the whole point of the chart, after all)
+    const hairline = 'rgba(255,255,255,0.08)', textMuted = 'rgba(255,255,255,0.45)';
+    ctx.strokeStyle = hairline; ctx.lineWidth = 1;
+    ctx.font = "11px 'IBM Plex Mono', monospace";
+    ctx.textBaseline = 'middle';
+    // futures-equivalent column (QQQ->NQ / SPY->ES), only when toggled on
+    // and this symbol actually has a live ratio attached -- see
+    // currentFuturesProxy() and FUTURES_PROXY_FOR in the Python fetch script.
+    // No standalone column header drawn here (it collided with the topmost
+    // gridline when that strike sat right at the plot's top edge) -- the
+    // toggle button and the underlying tile already say "NQ"/"ES".
+    const futuresProxy = state.showFutures ? currentFuturesProxy() : null;
+    for(const v of sortedAllStrikes){
+      if(v < pMin || v > pMax) continue;
+      const y = yPrice(v);
+      ctx.beginPath(); ctx.moveTo(PAD_LEFT, Math.round(y)+0.5); ctx.lineTo(PAD_LEFT+g.plotW, Math.round(y)+0.5); ctx.stroke();
+      ctx.textAlign = 'left'; ctx.fillStyle = textMuted; ctx.fillText(v.toFixed(0), PAD_LEFT+g.plotW+8, y);
+      if(futuresProxy){
+        ctx.fillStyle = 'rgba(91,155,236,0.8)';
+        ctx.fillText('≈' + toFutures(v).toFixed(0), PAD_LEFT + g.plotW + 44, y);
+        ctx.fillStyle = textMuted;
+      }
+    }
+
+    // x-axis labels
+    const labelEvery = Math.max(1, Math.ceil(n / Math.max(4, Math.floor(g.plotW/90))));
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for(let i=0;i<n;i+=labelEvery){
+      ctx.fillStyle = textMuted;
+      ctx.fillText(fmtTime(bars[i][0]), xAt(i), g.plotBottom+5);
+    }
+
+    // right-edge numeric labels: only for the Tiers path (top-tier combined
+    // OI) -- top-8 strikes are already labeled on the left with C/P, a
+    // second label would just be noise, and Gradient mode has no "tierHigh"
+    // concept to key off of
+    const topLabeled = state.heatMode === 'tiers'
+      ? oiLevels.filter(l => !special.has(l.strike) && l.oi >= state.tierHigh)
+      : [];
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.font = "11px 'IBM Plex Mono', monospace";
+    for(const lvl of topLabeled){
+      if(lvl.strike < pMin || lvl.strike > pMax) continue;
+      const y = yPrice(lvl.strike);
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fillText(lvl.strike.toFixed(0), PAD_LEFT+g.plotW-6, y);
+    }
+
+    // left-edge C/P/B labels for the top-8 levels, collected while drawing
+    // the heatmap bands above -- a solid white badge with a black border
+    // reads crisply against any band color or hue behind it, unlike text
+    // alone. Bounding boxes are stashed for the hover tooltip (see
+    // updateChartLabelTooltip()), keyed by strike so it can look up the
+    // real call/put numbers on hover, same as the table's tooltip.
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = "bold 15px 'IBM Plex Mono', monospace";
+    chartLabelHitRects = [];
+    for(const lbl of leftLabels){
+      const padX = 5, padY = 3, textW = ctx.measureText(lbl.text).width;
+      const boxX = PAD_LEFT + 2, boxY = lbl.y - (15+padY*2)/2;
+      const boxW = textW + padX*2, boxH = 15 + padY*2;
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(boxX, boxY, boxW, boxH);
+      ctx.strokeRect(boxX, boxY, boxW, boxH);
+      ctx.fillStyle = '#000000';
+      ctx.fillText(lbl.text, boxX + padX, lbl.y + 0.5);
+      if(lbl.strike !== undefined) chartLabelHitRects.push({ x: boxX, y: boxY, w: boxW, h: boxH, strike: lbl.strike });
+    }
+
+    // SMC fair value gaps + order blocks -- zones, drawn behind the candles
+    // so the price action that formed/filled them stays readable on top
+    if(smc){
+      const FVG_COLORS = { bull: '#60a5fa', bear: '#f472b6' };
+      for(const fvg of smc.fvgs){
+        const endIdx = fvg.fillIdx !== null ? fvg.fillIdx : smcFullLen-1;
+        if(endIdx < s || fvg.startIdx > e) continue;
+        const x0 = xAbsEdge(fvg.startIdx, 'left'), x1 = xAbsEdge(endIdx, 'right');
+        if(x1 <= x0) continue;
+        const y0 = clampY(yPrice(fvg.top)), y1 = clampY(yPrice(fvg.bottom));
+        ctx.fillStyle = hexToRgba(FVG_COLORS[fvg.dir], fvg.fillIdx !== null ? 0.06 : 0.22);
+        ctx.fillRect(x0, Math.min(y0,y1), x1-x0, Math.max(1, Math.abs(y1-y0)));
+      }
+      const OB_COLORS = { bull: '#2dd4bf', bear: '#e879f9' };
+      for(const ob of smc.obs){
+        const endIdx = ob.invalidIdx !== null ? ob.invalidIdx : smcFullLen-1;
+        if(endIdx < s || ob.idx > e) continue;
+        const x0 = xAbsEdge(ob.idx, 'left'), x1 = xAbsEdge(endIdx, 'right');
+        if(x1 <= x0) continue;
+        const y0 = clampY(yPrice(ob.top)), y1 = clampY(yPrice(ob.bottom));
+        ctx.fillStyle = hexToRgba(OB_COLORS[ob.dir], ob.invalidIdx !== null ? 0.06 : 0.24);
+        ctx.fillRect(x0, Math.min(y0,y1), x1-x0, Math.max(1, Math.abs(y1-y0)));
+      }
+    }
+
+    // candlesticks -- up hollow / down filled (same convention as the NQ
+    // tick chart), on top of the heatmap
+    const upColor = '#3ecf8e', downColor = '#e6605f';
+    const bodyW = Math.max(1.4, Math.min(10, slot * 0.62));
+    for(let i=0;i<n;i++){
+      const [ , o, h, l, c ] = bars[i];
+      const isUp = c >= o;
+      const color = isUp ? upColor : downColor;
+      const x = xAt(i);
+
+      ctx.strokeStyle = color; ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(x, yPrice(h)); ctx.lineTo(x, yPrice(l)); ctx.stroke();
+
+      const yo = yPrice(o), yc = yPrice(c);
+      const top = Math.min(yo,yc), bh = Math.max(1, Math.abs(yo-yc));
+      if(isUp){
+        ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+        ctx.strokeRect(x - bodyW/2 + 0.75, top, Math.max(1,bodyW-1.5), bh);
+      } else {
+        ctx.fillStyle = color;
+        ctx.fillRect(x - bodyW/2, top, bodyW, bh);
+      }
+    }
+
+    // SMC equal-high/low liquidity -- thin dashed lines, drawn on top of the
+    // candles (unlike the zones above) since these are markers, not areas
+    if(smc){
+      ctx.strokeStyle = 'rgba(203,213,225,0.55)'; ctx.lineWidth = 1; ctx.setLineDash([4,3]);
+      ctx.font = "10px 'IBM Plex Mono', monospace"; ctx.textBaseline = 'bottom';
+      for(const pool of smc.liquidity){
+        if(pool.lastIdx < s || pool.startIdx > e) continue;
+        const y = clampY(yPrice(pool.price));
+        const x0 = xAbsEdge(pool.startIdx, 'left'), x1 = PAD_LEFT + g.plotW;
+        ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+        ctx.fillStyle = 'rgba(203,213,225,0.75)'; ctx.textAlign = 'right';
+        ctx.fillText(pool.kind === 'high' ? 'EQH' : 'EQL', x1 - 3, y - 2);
+      }
+      ctx.setLineDash([]);
+    }
+
+    // balanced (call/put within 10% of each other) top-8 levels get a
+    // distinct blue line through the middle of their band -- in Gradient
+    // mode neither the call nor the put color would honestly represent a
+    // roughly even split, and even in Tiers mode this is information the
+    // green/orange/yellow rank color doesn't carry at all
+    ctx.strokeStyle = 'rgba(59,130,246,0.9)'; ctx.lineWidth = 2; ctx.setLineDash([]);
+    for(const [strike, lbl] of labelSet){
+      if(lbl !== 'B' || strike < pMin || strike > pMax) continue;
+      const y = clampY(yPrice(strike));
+      ctx.beginPath(); ctx.moveTo(PAD_LEFT, y); ctx.lineTo(PAD_LEFT + g.plotW, y); ctx.stroke();
+    }
+
+    // hover crosshair -- vertical (time) line, unchanged
+    if(state.hoverIdx >= s && state.hoverIdx < e){
+      const i = state.hoverIdx - s;
+      const x = xAt(i);
+      ctx.strokeStyle = 'rgba(91,155,236,0.9)'; ctx.setLineDash([3,3]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, g.plotTop); ctx.lineTo(x, g.plotBottom); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // hover crosshair -- horizontal (price) line + a floating price tag on
+    // the axis that tracks the cursor exactly, not snapped to a gridline
+    if(state.hoverClientY != null){
+      const rect = els.chart.getBoundingClientRect();
+      const hy = state.hoverClientY - rect.top;
+      if(hy >= g.plotTop && hy <= g.plotBottom){
+        const hoverPrice = priceAtClientY(state.hoverClientY);
+        ctx.strokeStyle = 'rgba(91,155,236,0.9)'; ctx.setLineDash([3,3]); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(PAD_LEFT, hy); ctx.lineTo(PAD_LEFT+g.plotW, hy); ctx.stroke();
+        ctx.setLineDash([]);
+
+        let label = hoverPrice.toFixed(2);
+        if(futuresProxy) label += `  ${futuresProxy.label}≈${toFutures(hoverPrice).toFixed(0)}`;
+        ctx.font = "bold 11px 'IBM Plex Mono', monospace";
+        const padX = 5, textW = ctx.measureText(label).width;
+        const boxW = textW + padX*2, boxH = 16;
+        const boxX = PAD_LEFT + g.plotW + 2;
+        ctx.fillStyle = 'rgba(91,155,236,0.95)';
+        ctx.fillRect(boxX, hy - boxH/2, boxW, boxH);
+        ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(label, boxX + padX, hy + 0.5);
+      }
+    }
+    ctx.textAlign = 'left';
+  }
+
+  // ---------- interaction ----------
+  function idxFromClientX(clientX){
+    const rect = els.chart.getBoundingClientRect();
+    const g = getGeom();
+    const x = clientX - rect.left - PAD_LEFT;
+    const { s, e } = visibleBars();
+    const n = e - s;
+    const slot = g.plotW / n;
+    let i = Math.floor(x/slot);
+    return s + Math.max(0, Math.min(n-1, i));
+  }
+
+  // hover the chart's own left-edge C/P/B badges -- same tooltip content and
+  // behavior as the table's strike-cell hover, just hit-tested against the
+  // badge rectangles draw() stashed in chartLabelHitRects
+  function updateChartLabelTooltip(clientX, clientY){
+    const rect = els.chart.getBoundingClientRect();
+    const x = clientX - rect.left, y = clientY - rect.top;
+    const hit = chartLabelHitRects.find(r => x>=r.x && x<=r.x+r.w && y>=r.y && y<=r.y+r.h);
+    if(hit){
+      els.oiTip.textContent = oiTooltipText(lastOiByStrike.get(hit.strike));
+      els.oiTip.style.left = (clientX + 14) + 'px';
+      els.oiTip.style.top = (clientY + 14) + 'px';
+      els.oiTip.classList.add('show');
+    } else {
+      els.oiTip.classList.remove('show');
+    }
+  }
+
+  // ---- vertical (price-axis) zoom: drag the right price-axis margin,
+  // TradingView/NinjaTrader style, to zoom in/out around the point you
+  // grabbed. Double-click that margin to return to auto-fit.
+  function inAxisRegion(clientX){
+    const rect = els.chart.getBoundingClientRect();
+    return (clientX - rect.left) > (rect.width - padRight());
+  }
+  function priceAtClientY(clientY, range){
+    range = range || lastRange;
+    if(!range) return null;
+    const rect = els.chart.getBoundingClientRect();
+    const y = clientY - rect.top;
+    const { pMin, pMax, plotTop, plotBottom } = range;
+    return pMin + (pMax - pMin) * (1 - (y - plotTop) / (plotBottom - plotTop));
+  }
+
+  els.chart.addEventListener('mousemove', ev => {
+    if(state.yDragging){
+      const deltaY = ev.clientY - state.yDragStartY;
+      // dragging down widens the range (zoom out); dragging up narrows it
+      // (zoom in) -- the point originally grabbed stays under the cursor
+      const factor = Math.pow(1.006, deltaY);
+      const anchor = state.yDragAnchorPrice;
+      const { pMin: p0, pMax: p1 } = state.yDragStartRange;
+      let newPMin = anchor - (anchor - p0) * factor;
+      let newPMax = anchor + (p1 - anchor) * factor;
+      if(newPMax - newPMin > 0.5){ state.yRangeOverride = { pMin: newPMin, pMax: newPMax }; draw(); }
+      return;
+    }
+    els.chart.style.cursor = inAxisRegion(ev.clientX) ? 'ns-resize' : '';
+    if(state.dragging){
+      const dx = ev.clientX - state.dragX;
+      const g = getGeom();
+      const slot = g.plotW / state.visibleCount;
+      const barsDelta = Math.round(-dx/slot);
+      let ns = state.dragStartVisible + barsDelta;
+      const total = currentBars().length;
+      ns = Math.max(0, Math.min(total - state.visibleCount, ns));
+      state.visibleStart = ns;
+      // vertical pan too -- grab-and-drag the price itself, TradingView-style,
+      // so a squashed/off-center view (e.g. after zooming in) can be recentered
+      // without resetting. Whatever price was under the cursor at mousedown
+      // stays under the cursor as you drag.
+      if(state.panStartRange){
+        const startPrice = priceAtClientY(state.panStartY, state.panStartRange);
+        const curPrice = priceAtClientY(ev.clientY, state.panStartRange);
+        const offset = startPrice - curPrice;
+        state.yRangeOverride = {
+          pMin: state.panStartRange.pMin + offset,
+          pMax: state.panStartRange.pMax + offset,
+        };
+      }
+      draw();
+      return;
+    }
+    const idx = idxFromClientX(ev.clientX);
+    state.hoverIdx = idx;
+    state.hoverClientY = ev.clientY;
+    const b = currentBars()[idx];
+    if(b){
+      els.roT.textContent = fmtTime(b[0]);
+      els.roO.textContent = b[1].toFixed(2); els.roH.textContent = b[2].toFixed(2);
+      els.roL.textContent = b[3].toFixed(2); els.roC.textContent = b[4].toFixed(2);
+      els.readout.classList.add('show');
+    }
+    updateChartLabelTooltip(ev.clientX, ev.clientY);
+    draw();
+  });
+  els.chart.addEventListener('mouseleave', () => {
+    state.hoverIdx=-1; state.hoverClientY=null; els.readout.classList.remove('show');
+    els.oiTip.classList.remove('show');
+    if(!state.dragging && !state.yDragging) draw();
+  });
+  els.chart.addEventListener('mousedown', ev => {
+    if(inAxisRegion(ev.clientX) && lastRange){
+      state.yDragging = true;
+      state.yDragStartY = ev.clientY;
+      state.yDragAnchorPrice = priceAtClientY(ev.clientY);
+      state.yDragStartRange = state.yRangeOverride
+        ? { ...state.yRangeOverride }
+        : { pMin: lastRange.pMin, pMax: lastRange.pMax };
+      return;
+    }
+    state.dragging=true; state.dragX=ev.clientX; state.dragStartVisible=state.visibleStart;
+    state.panStartY = ev.clientY;
+    state.panStartRange = lastRange ? { ...lastRange } : null;
+  });
+  els.chart.addEventListener('dblclick', ev => {
+    if(inAxisRegion(ev.clientX)){ state.yRangeOverride = null; draw(); }
+  });
+  els.btnResetZoom.addEventListener('click', () => { state.yRangeOverride = null; draw(); });
+  els.btnSMC.addEventListener('click', () => {
+    state.showSMC = !state.showSMC;
+    els.btnSMC.setAttribute('aria-pressed', String(state.showSMC));
+    els.btnSMC.textContent = 'SMC overlay: ' + (state.showSMC ? 'on' : 'off');
+    els.smcLegend.hidden = !state.showSMC;
+    draw();
+  });
+  function updateFuturesButton(){
+    const fp = currentFuturesProxy();
+    els.btnFutures.hidden = !fp;
+    if(fp){
+      els.btnFutures.textContent = `Futures axis (${fp.label}): ` + (state.showFutures ? 'on' : 'off');
+      els.futuresBasisInput.value = currentFuturesBasis();
+    }
+    els.futuresBasisControls.hidden = !(fp && state.showFutures);
+  }
+  els.btnFutures.addEventListener('click', () => {
+    state.showFutures = !state.showFutures;
+    els.btnFutures.setAttribute('aria-pressed', String(state.showFutures));
+    updateFuturesButton();
+    draw();
+  });
+  els.futuresBasisInput.addEventListener('input', () => {
+    const fp = currentFuturesProxy();
+    if(fp) state.futuresBasisByLabel[fp.label] = Number(els.futuresBasisInput.value) || 0;
+    updateTiles(); // tile's NQ/ES readout depends on the basis too, not just the chart
+    draw();
+  });
+  window.addEventListener('mouseup', () => { state.dragging=false; state.yDragging=false; });
+  els.chart.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    const factor = ev.deltaY>0 ? 1.18 : 0.85;
+    const total = currentBars().length;
+    const idx = idxFromClientX(ev.clientX);
+    let nc = Math.round(state.visibleCount*factor);
+    nc = Math.max(20, Math.min(total, nc));
+    const frac = (idx - state.visibleStart)/state.visibleCount;
+    let ns = Math.round(idx - frac*nc);
+    ns = Math.max(0, Math.min(total-nc, ns));
+    state.visibleCount = nc; state.visibleStart = ns;
+    draw();
+  }, {passive:false});
+
+  // ---------- controls ----------
+  function resetView(){
+    const total = currentBars().length;
+    state.visibleCount = Math.min(total, 180);
+    state.visibleStart = Math.max(0, total - state.visibleCount);
+  }
+
+  function refreshAll(){
+    els.symTitle.textContent = state.symbol;
+    updateTiles();
+    renderChain();
+    updateThresholdLabel();
+    updateFuturesButton();
+    draw();
+  }
+
+  function updateThresholdLabel(){
+    const oiLevels = currentOiLevels();
+    if(state.heatMode === 'gradient'){
+      const top = oiLevels.slice(0, 8).map(l => l.strike.toFixed(0)).join(', ');
+      els.levelCount.textContent = oiLevels.length ? `(levels: ${top})` : '(no OI data for this tab)';
+      return;
+    }
+    const shown = oiLevels.filter(l => l.oi >= state.tierLow).length;
+    const top = oiLevels.filter(l => l.oi >= state.tierHigh).length;
+    els.levelCount.textContent = `(${shown} of ${oiLevels.length} strikes shown, ${top} at top tier)`;
+  }
+
+  function setSymbol(sym){
+    state.symbol = sym;
+    [els.btnNDX, els.btnSPX, els.btnSPY, els.btnQQQ].forEach(b => b.setAttribute('aria-pressed', b.textContent===sym));
+    resetView();
+    state.yRangeOverride = null; // different symbol = different price scale entirely
+    refreshAll();
+  }
+  els.btnNDX.addEventListener('click', () => setSymbol('NDX'));
+  els.btnSPX.addEventListener('click', () => setSymbol('SPX'));
+  els.btnSPY.addEventListener('click', () => setSymbol('SPY'));
+  els.btnQQQ.addEventListener('click', () => setSymbol('QQQ'));
+
+  function setTf(tf){
+    state.tf = tf;
+    els.btn1m.setAttribute('aria-pressed', tf==='1m');
+    els.btn5m.setAttribute('aria-pressed', tf==='5m');
+    resetView();
+    refreshAll();
+  }
+  els.btn1m.addEventListener('click', () => setTf('1m'));
+  els.btn5m.addEventListener('click', () => setTf('5m'));
+
+  function setExp(expKey, btn){
+    state.exp = expKey;
+    [els.tabCurrentDay, els.tabNextDay, els.tabCurrentMonth].forEach(b => b.setAttribute('aria-pressed', b===btn));
+    refreshAll();
+  }
+  els.tabCurrentDay.addEventListener('click', () => setExp('current_day', els.tabCurrentDay));
+  els.tabNextDay.addEventListener('click', () => setExp('next_day', els.tabNextDay));
+  els.tabCurrentMonth.addEventListener('click', () => setExp('current_month', els.tabCurrentMonth));
+
+  function readTiers(){
+    // keep them ordered (low <= mid <= high) no matter what the user types
+    let lo = Number(els.tierLowInput.value) || 0;
+    let mid = Number(els.tierMidInput.value) || 0;
+    let hi = Number(els.tierHighInput.value) || 0;
+    mid = Math.max(mid, lo);
+    hi = Math.max(hi, mid);
+    state.tierLow = lo; state.tierMid = mid; state.tierHigh = hi;
+    updateThresholdLabel();
+    draw();
+  }
+  [els.tierLowInput, els.tierMidInput, els.tierHighInput].forEach(inp => {
+    inp.addEventListener('input', readTiers);
+  });
+  els.tableGexFloorInput.addEventListener('input', () => {
+    state.tableGexFloor = Math.max(0, Number(els.tableGexFloorInput.value) || 0);
+    renderChain();
+  });
+  els.tableOiFloorInput.addEventListener('input', () => {
+    state.tableOiFloor = Math.max(0, Number(els.tableOiFloorInput.value) || 0);
+    renderChain();
+  });
+
+  // ---------- heatmap mode: Tiers (discrete green/orange/yellow/red bands)
+  // vs Gradient (a small localized color bump per top-8-by-OI level, any
+  // hue you pick)
+  function updateHeatModeUI(){
+    const isGrad = state.heatMode === 'gradient';
+    els.btnHeatTiers.setAttribute('aria-pressed', String(!isGrad));
+    els.btnHeatGradient.setAttribute('aria-pressed', String(isGrad));
+    els.tierControls.hidden = isGrad;
+    els.gradientControls.hidden = !isGrad;
+    els.gradientIntensityValue.textContent = state.gradientIntensity + '%';
+    if(isGrad){
+      // put color -> balanced blend -> call color, so the ramp itself shows
+      // what B/C/P will actually look like on the chart
+      const blend = blendHex(state.gradientCallColor, state.gradientPutColor);
+      els.legendRamp.style.background = `linear-gradient(to right, ${hexToRgba(state.gradientPutColor,0.85)}, ${hexToRgba(blend,0.85)}, ${hexToRgba(state.gradientCallColor,0.85)})`;
+    } else {
+      els.legendRamp.style.background = ''; // fall back to the CSS-defined red ramp
+    }
+  }
+  function setHeatMode(mode){
+    state.heatMode = mode;
+    updateHeatModeUI();
+    updateThresholdLabel();
+    draw();
+  }
+  els.btnHeatTiers.addEventListener('click', () => setHeatMode('tiers'));
+  els.btnHeatGradient.addEventListener('click', () => setHeatMode('gradient'));
+  els.gradientCallColorInput.addEventListener('input', () => {
+    state.gradientCallColor = els.gradientCallColorInput.value;
+    updateHeatModeUI();
+    draw();
+  });
+  els.gradientPutColorInput.addEventListener('input', () => {
+    state.gradientPutColor = els.gradientPutColorInput.value;
+    updateHeatModeUI();
+    draw();
+  });
+  els.gradientIntensityInput.addEventListener('input', () => {
+    state.gradientIntensity = Number(els.gradientIntensityInput.value) || 0;
+    els.gradientIntensityValue.textContent = state.gradientIntensity + '%';
+    draw();
+  });
+
+  window.addEventListener('resize', resizeCanvas);
+  new ResizeObserver(resizeCanvas).observe(els.chartShell);
+  function repaintTheme(){ draw(); }
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', repaintTheme);
+  new MutationObserver(repaintTheme).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+
+  // ---------- view-state persistence across auto-reloads ----------
+  // This page is meant to be regenerated on disk every ~5 minutes by a
+  // scheduled local script and to reload itself to pick up the fresh data;
+  // without this, every reload would silently reset your symbol/expiration/
+  // zoom choice back to the defaults.
+  const PERSIST_KEY = 'gexDashboardView';
+  function saveView(){
+    try{
+      localStorage.setItem(PERSIST_KEY, JSON.stringify({
+        symbol: state.symbol, exp: state.exp, tf: state.tf,
+        tierLow: state.tierLow, tierMid: state.tierMid, tierHigh: state.tierHigh,
+        tableGexFloor: state.tableGexFloor,
+        tableOiFloor: state.tableOiFloor,
+        visibleStart: state.visibleStart, visibleCount: state.visibleCount,
+        yRangeOverride: state.yRangeOverride,
+        heatMode: state.heatMode, gradientCallColor: state.gradientCallColor, gradientPutColor: state.gradientPutColor, gradientIntensity: state.gradientIntensity,
+        showSMC: state.showSMC, showFutures: state.showFutures, futuresBasisByLabel: state.futuresBasisByLabel,
+      }));
+    }catch(e){ /* private browsing / storage disabled -- just skip persistence */ }
+  }
+  function restoreView(){
+    let saved = null;
+    try{ saved = JSON.parse(localStorage.getItem(PERSIST_KEY) || 'null'); }catch(e){}
+    if(!saved) return;
+    if(SYMBOLS.includes(saved.symbol)) state.symbol = saved.symbol;
+    if(['current_day','next_day','current_month'].includes(saved.exp)) state.exp = saved.exp;
+    if(['1m','5m'].includes(saved.tf)) state.tf = saved.tf;
+    if(typeof saved.tierLow === 'number') state.tierLow = saved.tierLow;
+    if(typeof saved.tierMid === 'number') state.tierMid = saved.tierMid;
+    if(typeof saved.tierHigh === 'number') state.tierHigh = saved.tierHigh;
+    if(typeof saved.tableGexFloor === 'number') state.tableGexFloor = Math.max(0, saved.tableGexFloor);
+    if(typeof saved.tableOiFloor === 'number') state.tableOiFloor = Math.max(0, saved.tableOiFloor);
+    const total = currentBars().length;
+    if(typeof saved.visibleCount === 'number') state.visibleCount = Math.max(20, Math.min(total, saved.visibleCount));
+    if(typeof saved.visibleStart === 'number') state.visibleStart = Math.max(0, Math.min(total - state.visibleCount, saved.visibleStart));
+    if(saved.yRangeOverride && typeof saved.yRangeOverride.pMin === 'number' && typeof saved.yRangeOverride.pMax === 'number'){
+      state.yRangeOverride = saved.yRangeOverride;
+    }
+    if(['tiers','gradient'].includes(saved.heatMode)) state.heatMode = saved.heatMode;
+    if(typeof saved.gradientCallColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(saved.gradientCallColor)) state.gradientCallColor = saved.gradientCallColor;
+    if(typeof saved.gradientPutColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(saved.gradientPutColor)) state.gradientPutColor = saved.gradientPutColor;
+    if(typeof saved.gradientIntensity === 'number') state.gradientIntensity = Math.max(0, Math.min(100, saved.gradientIntensity));
+    if(typeof saved.showSMC === 'boolean') state.showSMC = saved.showSMC;
+    if(typeof saved.showFutures === 'boolean') state.showFutures = saved.showFutures;
+    if(saved.futuresBasisByLabel && typeof saved.futuresBasisByLabel === 'object'){
+      for(const [label, val] of Object.entries(saved.futuresBasisByLabel)){
+        if(typeof val === 'number') state.futuresBasisByLabel[label] = val;
+      }
+    }
+
+    [els.btnNDX, els.btnSPX, els.btnSPY, els.btnQQQ].forEach(b => b.setAttribute('aria-pressed', b.textContent===state.symbol));
+    els.btn1m.setAttribute('aria-pressed', state.tf==='1m');
+    els.btn5m.setAttribute('aria-pressed', state.tf==='5m');
+    [els.tabCurrentDay, els.tabNextDay, els.tabCurrentMonth].forEach(b => b.setAttribute('aria-pressed', b.dataset.exp===state.exp));
+    els.tierLowInput.value = state.tierLow;
+    els.tierMidInput.value = state.tierMid;
+    els.tierHighInput.value = state.tierHigh;
+    els.tableGexFloorInput.value = state.tableGexFloor;
+    els.tableOiFloorInput.value = state.tableOiFloor;
+    els.gradientCallColorInput.value = state.gradientCallColor;
+    els.gradientPutColorInput.value = state.gradientPutColor;
+    els.gradientIntensityInput.value = state.gradientIntensity;
+    updateHeatModeUI();
+    els.btnSMC.setAttribute('aria-pressed', String(state.showSMC));
+    els.btnSMC.textContent = 'SMC overlay: ' + (state.showSMC ? 'on' : 'off');
+    els.smcLegend.hidden = !state.showSMC;
+    els.btnFutures.setAttribute('aria-pressed', String(state.showFutures));
+    els.futuresBasisInput.value = currentFuturesBasis();
+  }
+  ['click','input'].forEach(evt => document.addEventListener(evt, () => saveView(), {capture:true}));
+
+  // ---------- auto-reload ----------
+  // Full reload (not a data-only refetch) because this is a plain file://
+  // page with no server to poll -- simplest reliable way to pick up a
+  // regenerated HTML file. View state above survives the reload. Matched to
+  // the Task Scheduler refresh cadence (every 1 minute, see
+  // run_gex_refresh.bat) -- reloading more often than the data actually
+  // changes just re-shows the same numbers and interrupts whatever you were
+  // doing on the chart for nothing. (Was 5 minutes; tightened back to 1 now
+  // that the popup itself is fixed at the root via the hidden VBS launcher,
+  // so there's no longer a tradeoff between freshness and popup annoyance.)
+  const AUTO_RELOAD_SECONDS = 60;
+  let secondsLeft = AUTO_RELOAD_SECONDS;
+  function tickCountdown(){
+    secondsLeft -= 1;
+    const m = Math.floor(secondsLeft / 60), s = secondsLeft % 60;
+    els.reloadCountdown.textContent = secondsLeft > 0 ? `reloads in ${m}:${String(s).padStart(2,'0')}` : 'reloading…';
+    if(secondsLeft <= 0){ saveView(); location.reload(); }
+  }
+  setInterval(tickCountdown, 1000);
+
+  // ---------- init ----------
+  els.footGenerated.textContent = 'Generated ' + DATA.generatedAt;
+  els.reloadCountdown.textContent = `reloads in ${secondsLeft}s`;
+  resetView();
+  restoreView();
+  refreshAll();
+  resizeCanvas();
+})();
+</script>

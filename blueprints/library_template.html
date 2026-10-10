@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BP Library</title>
+<style>
+  :root { --bg:#0f1115; --panel:#151821; --card:#181c26; --line:#2a2f3a; --text:#d8dbe2; --muted:#8b919c; --up:#3ddc84; --down:#ff5c5c; --side:#f2c94c; --accent:#6aa9ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; height:100vh; display:flex; flex-direction:column; }
+  header { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0; font-weight:600; }
+  header .muted { color:var(--muted); }
+  select, input[type=date], button { background:#232836; color:var(--text); border:1px solid #3a4152; border-radius:6px; padding:5px 9px; font:inherit; }
+  button { cursor:pointer; } button:hover { background:#2c3344; }
+  .wrap { flex:1; display:flex; min-height:0; }
+  #filters { width:290px; overflow:auto; padding:10px 12px; border-right:1px solid var(--line); background:var(--panel); }
+  #filters h3 { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:12px 0 5px; }
+  .chip { display:inline-flex; gap:5px; align-items:center; margin:0 4px 4px 0; padding:2px 8px; border-radius:11px; border:1px solid #333a49; background:#1b2030; color:var(--text); font-size:12px; cursor:pointer; user-select:none; }
+  .chip .n { color:var(--muted); font-size:11px; }
+  .chip.on { background:#25407a; border-color:var(--accent); }
+  .chip.zero { opacity:.35; }
+  #grid { flex:1; overflow:auto; padding:12px; display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:10px; align-content:start; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px; cursor:pointer; }
+  .card:hover { border-color:#4b5568; } .card.sel { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .card .top { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; } .card .top .muted { color:var(--muted); }
+  .tag { display:inline-block; padding:0 6px; border-radius:9px; font-size:11px; font-weight:600; margin-right:3px; }
+  .UP, .DECISIVE_UP { background:#123d26; color:var(--up); } .DOWN, .DECISIVE_DOWN { background:#431a1d; color:var(--down); }
+  .SIDEWAYS, .MIXED { background:#3d3412; color:var(--side); }
+  #detail { width:600px; overflow:auto; border-left:1px solid var(--line); background:var(--panel); padding:12px 14px; display:none; }
+  #detail.open { display:block; }
+  #detail h2 { font-size:15px; margin:0 0 4px; }
+  #detail h3 { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:14px 0 6px; }
+  #detail a { color:var(--accent); }
+  table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; } td { padding:2px 4px 2px 0; vertical-align:top; } td.k { color:var(--muted); width:48%; }
+  .nb { display:inline-block; margin:0 6px 4px 0; padding:2px 8px; border:1px solid #333a49; border-radius:6px; cursor:pointer; font-size:12px; }
+  .nb:hover { border-color:var(--accent); }
+  #dchart { width:100%; height:260px; display:block; background:#0f1115; border:1px solid var(--line); border-radius:6px; touch-action:none; user-select:none; }
+  .hint { color:var(--muted); font-size:12px; }
+  @media (max-width:1100px) { #detail { position:fixed; inset:50px 0 0 auto; width:min(600px,100%); z-index:5; } #filters { width:220px; } }
+  @media (max-width:700px) { .wrap { flex-direction:column; } #filters { width:auto; max-height:35vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>NQ Blueprint Library</h1>
+  <span class="muted" id="summary"></span>
+  <label class="muted">sort <select id="sort">
+    <option value="date_desc">newest first</option><option value="date_asc">oldest first</option>
+    <option value="net_desc">most up (session)</option><option value="net_asc">most down (session)</option>
+    <option value="range_desc">biggest range vs normal</option><option value="range_asc">smallest range vs normal</option>
+    <option value="chop_asc">choppiest</option><option value="chop_desc">cleanest legs</option>
+    <option value="similar">most similar to selected BP</option></select></label>
+  <label class="muted">go to <input type="date" id="goto"></label>
+  <button id="clear">Clear filters</button>
+</header>
+<div class="wrap">
+  <div id="filters"></div>
+  <div id="grid"></div>
+  <div id="detail"></div>
+</div>
+<script>
+const LIB = /*__LIB__*/null;
+const BPS = LIB.bps;
+const byDate = Object.fromEntries(BPS.map(b => [b.date, b]));
+const GROUPS = [
+  ["Session type", t => t.startsWith("SESSION_") && !t.startsWith("SESSION_FAMILY")],
+  ["Session family", t => t.startsWith("SESSION_FAMILY_")],
+  ["RTH type (09:30-16:30)", t => t.startsWith("RTH_") && !t.startsWith("RTH_FAMILY") && !t.includes("VWAP") && !t.includes("REVERSAL")],
+  ["RTH family", t => t.startsWith("RTH_FAMILY_")],
+  ["Overnight then RTH", t => t.includes("_THEN_")],
+  ["NY open 09:30-10:30", t => t.startsWith("NYOPEN_")],
+  ["Asia / London / NY pre", t => /^(ASIA|LONDON|NYPRE)_/.test(t)],
+  ["NY midday / close", t => /^(NYMIDDAY|NYCLOSE)_/.test(t)],
+  ["Reversals", t => t.includes("REVERSAL")],
+  ["Opening range 09:30-10:00", t => t.startsWith("OR_")],
+  ["RTH open vs overnight range", t => t.startsWith("OPEN_")],
+  ["Session high made in", t => t.startsWith("HIGH_IN_")],
+  ["Session low made in", t => t.startsWith("LOW_IN_")],
+  ["Volatility / volume", t => /^(VOL_|VOLUME_)/.test(t)],
+  ["Leg character", t => ["CHOPPY", "CLEAN_LEGS", "SWIFT_LEGS", "DENSE_ROTATION"].includes(t)],
+  ["Retracements", t => t.startsWith("RETRACE_")],
+  ["Delta", t => t.startsWith("DELTA_")],
+  ["VWAP", t => t.includes("VWAP")],
+  ["Weekday", t => ["MON", "TUE", "WED", "THU", "FRI"].includes(t)],
+  ["Other", t => true],
+];
+const groupOf = t => GROUPS.findIndex(([, f]) => f(t));
+const ALLTAGS = [...new Set(BPS.flatMap(b => b.categories))];
+let selected = new Set(), current = null;
+
+const filtered = () => {
+  const sel = [...selected];
+  const byGroup = {};
+  sel.forEach(t => (byGroup[groupOf(t)] ||= []).push(t));
+  return BPS.filter(b => Object.values(byGroup).every(ts => ts.some(t => b.categories.includes(t))));   // OR inside a group, AND across groups
+};
+
+function renderFilters(list) {
+  const counts = {}; list.forEach(b => b.categories.forEach(t => counts[t] = (counts[t] || 0) + 1));
+  const box = document.getElementById("filters"); box.innerHTML = "";
+  GROUPS.forEach(([name], gi) => {
+    const tags = ALLTAGS.filter(t => groupOf(t) === gi).sort();
+    if (!tags.length) return;
+    const h = document.createElement("h3"); h.textContent = name; box.appendChild(h);
+    tags.forEach(t => {
+      const c = document.createElement("span");
+      c.className = "chip" + (selected.has(t) ? " on" : "") + (!counts[t] && !selected.has(t) ? " zero" : "");
+      c.innerHTML = `${t.replace(/_/g, " ").toLowerCase()} <span class="n">${counts[t] || 0}</span>`;
+      c.onclick = () => { selected.has(t) ? selected.delete(t) : selected.add(t); refresh(); };
+      box.appendChild(c);
+    });
+  });
+}
+
+function spark(b, w, h) {
+  const n = b.shape.length, X = i => 4 + i / (n - 1) * (w - 8), Y = y => 4 + (1 - y) * (h - 8);
+  const rth = X(186);
+  let s = `<svg width="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block;height:${h}px">`;
+  s += `<line x1="${rth}" x2="${rth}" y1="0" y2="${h}" stroke="#3b4252" stroke-dasharray="2 3"/>`;
+  s += `<polyline points="${b.shape.map((y, i) => X(i).toFixed(1) + "," + Y(y).toFixed(1)).join(" ")}" fill="none" stroke="#6b7280" stroke-width="1"/>`;
+  for (const k of b.skeleton) {
+    const col = k.type === "UP" ? "#3ddc84" : k.type === "DOWN" ? "#ff5c5c" : "#f2c94c";
+    s += `<line x1="${X(k.i0)}" y1="${Y(k.y0)}" x2="${X(k.i1)}" y2="${Y(k.y1)}" stroke="${col}" stroke-width="2.2" stroke-linecap="round"/>`;
+  }
+  return s + "</svg>";
+}
+
+function sortList(list) {
+  const v = document.getElementById("sort").value;
+  const key = {
+    date_desc: b => -Date.parse(b.date), date_asc: b => Date.parse(b.date), net_desc: b => -b.f.net, net_asc: b => b.f.net,
+    range_desc: b => -b.f.range_rel, range_asc: b => b.f.range_rel, chop_asc: b => b.f.zz_efficiency, chop_desc: b => -b.f.zz_efficiency,
+    similar: b => current ? rmse(b.shape, current.shape) : 0,
+  }[v];
+  return list.slice().sort((a, b) => key(a) - key(b));
+}
+const rmse = (a, b) => Math.sqrt(a.reduce((s, x, i) => s + (x - b[i]) ** 2, 0) / a.length);
+
+function renderGrid(list) {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = list.map(b => `<div class="card${current && current.date === b.date ? " sel" : ""}" data-d="${b.date}">
+    <div class="top"><b>${b.date}</b><span class="muted">${b.weekday.slice(0, 3)} · ${b.contract}</span></div>
+    ${spark(b, 240, 70)}
+    <div style="margin-top:5px"><span class="tag ${b.session_type}">${b.session_type.replace("_", " ")}</span>
+    <span class="muted" style="font-size:11px">RTH</span> <span class="tag ${b.rth_type}">${b.rth_type.replace("_", " ")}</span></div>
+    <div class="hint" style="margin-top:3px">${b.story.replace(/_/g, " ").toLowerCase()} · ${b.f.range.toFixed(0)} pts · ${b.phases}</div></div>`).join("");
+  grid.querySelectorAll(".card").forEach(c => c.onclick = () => select(c.dataset.d));
+}
+
+function refresh() {
+  const list = filtered();
+  document.getElementById("summary").textContent = `${list.length} of ${BPS.length} sessions · ${BPS[0].date} → ${BPS[BPS.length - 1].date}` +
+    (selected.size ? ` · filters: ${[...selected].join(" + ")}` : "");
+  renderFilters(list); renderGrid(sortList(list));
+}
+
+// ---- detail chart: crosshair + drag-to-scale axes (same conventions as the overlay pages)
+let dc = null;
+function drawDetail() {
+  const svg = document.getElementById("dchart"); if (!svg || !current) return;
+  const W = svg.clientWidth, H = svg.clientHeight, L = 6, Rt = 62, T = 8, B = 24, pw = W - L - Rt, ph = H - T - B;
+  const b = current, n = b.shape.length, lo = b.f.low, hi = b.f.high, rng = hi - lo;
+  dc.G = {W, H, L, Rt, T, B, pw, ph};
+  const X = i => L + (i - dc.x0) / (dc.x1 - dc.x0) * pw, Y = y => T + (dc.y1 - y) / (dc.y1 - dc.y0) * ph;
+  const clock = i => { const m = i * 5 + 18 * 60; return String(Math.floor(m / 60) % 24).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); };
+  let s = `<defs><clipPath id="dclip"><rect x="${L}" y="${T}" width="${pw}" height="${ph}"/></clipPath></defs>`;
+  s += `<rect x="${L + pw}" y="${T}" width="${Rt}" height="${ph}" fill="#12151c" style="cursor:ns-resize"/>`;
+  s += `<rect x="${L}" y="${T + ph}" width="${pw}" height="${B}" fill="#12151c" style="cursor:ew-resize"/>`;
+  for (const f of [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]) if (f >= dc.y0 && f <= dc.y1) {
+    s += `<line x1="${L}" x2="${L + pw}" y1="${Y(f)}" y2="${Y(f)}" stroke="#1f2430"/>`;
+    s += `<text x="${L + pw + 4}" y="${Y(f) + 4}" fill="#8b919c" font-size="10" pointer-events="none">${(lo + f * rng).toFixed(0)}</text>`;
+  }
+  const step = [6, 12, 24, 36, 48].find(k => (dc.x1 - dc.x0) / k <= 9) || 48;
+  for (let i = Math.ceil(dc.x0 / step) * step; i <= dc.x1; i += step)
+    if (X(i) >= L + 18 && X(i) <= L + pw - 18) s += `<line x1="${X(i)}" x2="${X(i)}" y1="${T}" y2="${T + ph}" stroke="#1a1e28"/><text x="${X(i)}" y="${T + ph + 15}" fill="#8b919c" font-size="10" text-anchor="middle" pointer-events="none">${clock(i)}</text>`;
+  s += `<g clip-path="url(#dclip)"><line x1="${X(186)}" x2="${X(186)}" y1="${T}" y2="${T + ph}" stroke="#4b5563" stroke-dasharray="3 3"/>`;
+  s += `<polyline points="${b.shape.map((y, i) => X(i).toFixed(1) + "," + Y(y).toFixed(1)).join(" ")}" fill="none" stroke="#8b919c" stroke-width="1.1"/>`;
+  for (const k of b.skeleton) {
+    const col = k.type === "UP" ? "#3ddc84" : k.type === "DOWN" ? "#ff5c5c" : "#f2c94c";
+    s += `<line x1="${X(k.i0)}" y1="${Y(k.y0)}" x2="${X(k.i1)}" y2="${Y(k.y1)}" stroke="${col}" stroke-width="3" stroke-linecap="round"/>`;
+  }
+  s += "</g>";
+  if (dc.mouse && dc.mouse.x >= L && dc.mouse.x <= L + pw && dc.mouse.y >= T && dc.mouse.y <= T + ph) {
+    const mx = dc.mouse.x, my = dc.mouse.y, i = dc.x0 + (mx - L) / pw * (dc.x1 - dc.x0), y = dc.y1 - (my - T) / ph * (dc.y1 - dc.y0);
+    s += `<g pointer-events="none"><line x1="${mx}" x2="${mx}" y1="${T}" y2="${T + ph}" stroke="#9ca3af" stroke-dasharray="3 3"/><line x1="${L}" x2="${L + pw}" y1="${my}" y2="${my}" stroke="#9ca3af" stroke-dasharray="3 3"/>
+      <rect x="${L + pw + 1}" y="${my - 9}" width="${Rt - 2}" height="18" rx="3" fill="#e5e7eb"/><text x="${L + pw + 4}" y="${my + 4}" font-size="10" font-weight="600" fill="#0f1115">${(lo + y * rng).toFixed(2)}</text>
+      <rect x="${mx - 26}" y="${T + ph + 3}" width="52" height="17" rx="3" fill="#e5e7eb"/><text x="${mx}" y="${T + ph + 15}" font-size="10" font-weight="600" fill="#0f1115" text-anchor="middle">${clock(Math.round(i))}</text></g>`;
+  }
+  svg.innerHTML = s;
+}
+function wireDetailChart() {
+  const svg = document.getElementById("dchart");
+  dc = {x0: 0, x1: current.shape.length - 1, y0: -0.05, y1: 1.05, mouse: null, drag: null, last: 0};
+  const loc = e => { const r = svg.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; };
+  svg.onpointerdown = e => {
+    const p = loc(e), G = dc.G, dbl = e.timeStamp - dc.last < 400; dc.last = e.timeStamp;
+    if (p.x > G.L + G.pw) { if (dbl) { dc.y0 = -0.05; dc.y1 = 1.05; drawDetail(); return; } dc.drag = {t: "y", y: p.y, y0: dc.y0, y1: dc.y1}; }
+    else if (p.y > G.T + G.ph) { if (dbl) { dc.x0 = 0; dc.x1 = current.shape.length - 1; drawDetail(); return; } dc.drag = {t: "x", x: p.x, x0: dc.x0, x1: dc.x1}; }
+    else dc.drag = {t: "pan", x: p.x, y: p.y, x0: dc.x0, x1: dc.x1, y0: dc.y0, y1: dc.y1};
+    svg.setPointerCapture(e.pointerId);
+  };
+  svg.onpointermove = e => {
+    const p = loc(e), G = dc.G; dc.mouse = p; const d = dc.drag;
+    if (d && d.t === "y") { const f = Math.exp((p.y - d.y) * 0.006), m = (d.y0 + d.y1) / 2, h = (d.y1 - d.y0) / 2 * f; dc.y0 = m - h; dc.y1 = m + h; }
+    if (d && d.t === "x") { const f = Math.exp(-(p.x - d.x) * 0.006), m = (d.x0 + d.x1) / 2, h = Math.max(3, (d.x1 - d.x0) / 2 * f); dc.x0 = m - h; dc.x1 = m + h; }
+    if (d && d.t === "pan") { const dx = (p.x - d.x) / G.pw * (d.x1 - d.x0), dy = (p.y - d.y) / G.ph * (d.y1 - d.y0); dc.x0 = d.x0 - dx; dc.x1 = d.x1 - dx; dc.y0 = d.y0 + dy; dc.y1 = d.y1 + dy; }
+    drawDetail();
+  };
+  svg.onpointerup = () => { dc.drag = null; };
+  svg.onpointerleave = () => { dc.mouse = null; drawDetail(); };
+  svg.onwheel = e => { e.preventDefault(); const p = loc(e), G = dc.G, i = dc.x0 + (p.x - G.L) / G.pw * (dc.x1 - dc.x0), f = e.deltaY > 0 ? 1.2 : 1 / 1.2, span = Math.max(6, (dc.x1 - dc.x0) * f), fr = (i - dc.x0) / (dc.x1 - dc.x0); dc.x0 = i - fr * span; dc.x1 = dc.x0 + span; drawDetail(); };
+}
+
+function select(d) {
+  current = byDate[d];
+  const b = current, f = b.f, r = b.rth;
+  const pct = x => (x * 100).toFixed(0) + "%";
+  const el = document.getElementById("detail"); el.classList.add("open");
+  el.innerHTML = `<h2>${b.date} · ${b.weekday} · ${b.contract}</h2>
+    <div><span class="tag ${b.session_type}">SESSION ${b.session_type.replace("_", " ")}</span> <span class="tag ${b.rth_type}">RTH ${b.rth_type.replace("_", " ")}</span>
+      <span class="hint">${b.story.replace(/_/g, " ").toLowerCase()} · phases ${b.phases} (Asia-London-NYpre-NYopen-midday-close)</span></div>
+    <p><a href="view/BP_${b.date}.html" target="_blank">Open full BP on its chart (drag · opacity · crosshair)</a> · <a href="bp/BP_${b.date}.json" target="_blank">BP data (JSON)</a></p>
+    <svg id="dchart"></svg>
+    <div class="hint">Gray = 5-min closes (0 = session low, 1 = high), coloured = skeleton, dashed = 09:30. Drag price/time axis to scale, double-click axis to reset, wheel = zoom, drag = pan.</div>
+    <h3>Most similar (same family, closest shape)</h3>
+    <div>session: ${b.neighbours.session.map(n => `<span class="nb" data-d="${n.date}">${n.date} <span class="hint">${n.match_pct !== undefined ? n.match_pct.toFixed(0) + "% match" : n.rmse.toFixed(3)}</span></span>`).join("") || "—"}</div>
+    <div>RTH only: ${b.neighbours.rth.map(n => `<span class="nb" data-d="${n.date}">${n.date} <span class="hint">${n.match_pct !== undefined ? n.match_pct.toFixed(0) + "% match" : n.rmse.toFixed(3)}</span></span>`).join("") || "—"}</div>
+    <div class="hint">match % = 100 × (1 − shape distance ÷ typical distance between two random days)</div>
+    <h3>Track record of this BP as a match</h3>
+    <div>${b.track && b.track.used ? `used in <b>${b.track.used}</b> predictions for later days · <b>${b.track.hits}</b> hits · success <b>${b.track.success_pct}%</b> · average match ${b.track.avg_match_pct}%`
+      : "not used as a match yet"}</div>
+    <h3>Predictions made FOR this day (walk-forward, earlier days only)</h3>
+    ${b.predictions && b.predictions.length ? `<table><tr><td class="k">as of · #</td><td class="k">matched BP</td><td class="k">match</td><td class="k">predicted</td><td class="k">actual</td><td class="k"></td></tr>
+      ${b.predictions.map(p => `<tr><td>${p.as_of} · ${p.rank}</td><td><span class="nb" data-d="${p.bp_date}">${p.bp_date}</span></td><td>${p.match_pct.toFixed(0)}%</td>
+        <td>${p.predicted_dir.toLowerCase()} ${p.predicted_move_pts > 0 ? "+" : ""}${p.predicted_move_pts.toFixed(0)}</td>
+        <td>${p.actual_dir.toLowerCase()} ${p.actual_move_pts > 0 ? "+" : ""}${p.actual_move_pts.toFixed(0)}</td>
+        <td style="color:${p.hit ? "#3ddc84" : "#ff5c5c"}">${p.hit ? "hit" : "miss"}</td></tr>`).join("")}</table>
+      <div class="hint">predicted = the matched BP's rest-of-day move, scaled to this day's range so far; direction = up/down if ≥ 25% of the range so far</div>`
+      : `<div class="hint">none (the first ${40} library days have too little history)</div>`}
+    <h3>Key numbers</h3><table>
+      <tr><td class="k">Session O / H / L / C</td><td>${f.open.toFixed(2)} / ${f.high.toFixed(2)} / ${f.low.toFixed(2)} / ${f.close.toFixed(2)}</td></tr>
+      <tr><td class="k">Range · vs prior 20 sessions</td><td>${f.range.toFixed(2)} pts · ${f.range_rel.toFixed(2)}×</td></tr>
+      <tr><td class="k">Net move (share of range)</td><td>${f.net_pts > 0 ? "+" : ""}${f.net_pts.toFixed(2)} pts (${pct(f.net)})</td></tr>
+      <tr><td class="k">RTH O / H / L / C</td><td>${r.open.toFixed(2)} / ${r.high.toFixed(2)} / ${r.low.toFixed(2)} / ${r.close.toFixed(2)}</td></tr>
+      <tr><td class="k">RTH net (share of RTH range)</td><td>${pct(r.net)} · close at ${pct(r.close_pos)} of RTH range</td></tr>
+      <tr><td class="k">Volume vs prior 20</td><td>${f.volume.toLocaleString()} · ${f.vol_rel.toFixed(2)}×</td></tr>
+      <tr><td class="k">30-pt legs · leg efficiency</td><td>${f.n_legs} · ${f.zz_efficiency.toFixed(3)} (range ÷ all leg travel)</td></tr>
+      <tr><td class="k">Median Fib ratio of legs</td><td>${f.median_fib === null ? "—" : pct(f.median_fib)}</td></tr>
+      <tr><td class="k">Mid-point crosses / min (median leg)</td><td>${f.median_leg_crosses_per_min}</td></tr>
+      <tr><td class="k">RTH delta ratio · session</td><td>${f.rth_delta_ratio.toFixed(4)} · ${f.delta_ratio.toFixed(4)}</td></tr>
+      <tr><td class="k">RTH time above VWAP · VWAP crosses</td><td>${f.rth_pct_above_vwap.toFixed(0)}% · ${f.rth_vwap_crosses}</td></tr>
+      <tr><td class="k">Opening range broke first</td><td>${f.or_break_first}</td></tr>
+      <tr><td class="k">RTH open in overnight range</td><td>${pct(f.rth_open_in_on_range)}</td></tr></table>
+    <h3>Categories (${b.categories.length})</h3><div>${b.categories.map(t => `<span class="chip${selected.has(t) ? " on" : ""}" data-t="${t}">${t.replace(/_/g, " ").toLowerCase()}</span>`).join("")}</div>
+    <div class="hint">Click a category to filter the library by it.</div>`;
+  el.querySelectorAll(".nb").forEach(x => x.onclick = () => select(x.dataset.d));
+  el.querySelectorAll(".chip[data-t]").forEach(x => x.onclick = () => { selected.add(x.dataset.t); refresh(); });
+  wireDetailChart(); drawDetail();
+  document.querySelectorAll(".card").forEach(c => c.classList.toggle("sel", c.dataset.d === d));
+  if (document.getElementById("sort").value === "similar") refresh();
+}
+
+document.getElementById("sort").onchange = refresh;
+document.getElementById("clear").onclick = () => { selected.clear(); refresh(); };
+document.getElementById("goto").onchange = e => { if (byDate[e.target.value]) select(e.target.value); };
+window.addEventListener("resize", drawDetail);
+refresh();
+</script>
+</body>
+</html>

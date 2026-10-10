@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BP Matches</title>
+<style>
+  :root { --bg:#0f1115; --panel:#151821; --line:#2a2f3a; --text:#d8dbe2; --muted:#8b919c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  header { position:sticky; top:0; z-index:3; display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; padding:9px 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0; font-weight:600; }
+  header label { display:flex; align-items:center; gap:6px; color:var(--muted); }
+  select, button { background:#232836; color:var(--text); border:1px solid #3a4152; border-radius:6px; padding:4px 9px; font:inherit; cursor:pointer; }
+  button:hover { background:#2c3344; }
+  .hint { color:var(--muted); font-size:12px; }
+  section { padding:10px 16px 16px; border-bottom:1px solid var(--line); }
+  .dayhead { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; margin-bottom:6px; }
+  .dayhead h2 { font-size:15px; margin:0; }
+  .tag { display:inline-block; padding:0 7px; border-radius:9px; font-size:11px; font-weight:600; }
+  .UP, .DECISIVE_UP { background:#123d26; color:#3ddc84; } .DOWN, .DECISIVE_DOWN { background:#431a1d; color:#ff5c5c; }
+  .SIDEWAYS, .MIXED { background:#3d3412; color:#f2c94c; }
+  .mrow { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 8px; }
+  .match { display:flex; align-items:center; gap:10px; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:#141821; }
+  .match.off { opacity:.45; }
+  .badge { width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:700; color:#0f1115; cursor:pointer; user-select:none; flex:none; }
+  .match .info { font-size:12px; line-height:1.35; }
+  .pct { font-weight:700; font-size:13px; }
+  .match input[type=range] { width:100px; }
+  .xf { font-variant-numeric:tabular-nums; }
+  .chartbox { height:max(560px, 78vh); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  svg { display:block; width:100%; height:100%; user-select:none; touch-action:none; }
+  details { margin-top:8px; } summary { cursor:pointer; color:var(--muted); }
+  table { border-collapse:collapse; font-variant-numeric:tabular-nums; margin-top:6px; } td, th { padding:2px 10px 2px 0; text-align:left; } th { color:var(--muted); font-weight:500; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Real NQ days with their closest library BPs</h1>
+  <label>BP detail <select id="detail"><option value="skeleton" selected>skeleton (main moves)</option><option value="legs">30-pt legs</option></select></label>
+  <label>BP scale <select id="scale"><option value="fit">fit to this day's high-low</option><option value="points">BP's own points, from this day's open</option></select></label>
+  <label><input id="extras" type="checkbox" checked> BP's VWAP/SMA + panels</label>
+  <label><input id="mids" type="checkbox" checked> leg mid-points</label>
+  <label>candles <select id="tf"><option value="auto">auto</option><option value="1">1 min</option><option value="5">5 min</option><option value="15">15 min</option></select></label>
+  <span class="hint">Number = BP on/off · slider = its opacity · drag a BP line = move it · <b>double-click a BP line and drag</b>: sideways away from its centre = wider in time, towards = narrower; up/down away = taller in price, towards = flatter · axes: drag to stretch, double-click to reset · wheel = zoom · drag background = pan</span>
+</header>
+<div id="days"></div>
+<script>
+const DAYS = /*__DAYS__*/null;
+const NS = "http://www.w3.org/2000/svg";
+const COLORS = ["#38bdf8", "#fb923c", "#e879f9", "#facc15", "#a3e635"];
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const opt = id => document.getElementById(id).value;
+const chk = id => document.getElementById(id).checked;
+const charts = [];
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
+function niceStep(span, target, steps) { for (const s of steps) if (span / s <= target) return s; return steps[steps.length - 1]; }
+const ID = () => ({at: 1, bt: 0, ap: 1, bp: 0});
+
+function makeChart(day, host, controls) {
+  const svg = el("svg", {}, host);
+  const T0 = Date.parse(day.start.replace(" ", "T"));
+  const CH = day.chart, END = CH.m[CH.m.length - 1] + 1, sid = "c" + day.date.replace(/-/g, "");
+  const st = {view: {x0: -10, x1: END + 10}, yAuto: true, yTop: day.high, yBot: day.low, tf: 5, candles: null, mouse: null, drag: null,
+              lastDown: {t: 0, x: 0, y: 0}, ov: day.matches.map(() => ({on: true, opacity: 0.7, A: ID()}))};
+  const clockOf = m => { const d = new Date(T0 + m * 60000); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+  const dayOf = m => { const d = new Date(T0 + m * 60000); return DOW[d.getDay()] + " " + (d.getMonth() + 1) + "/" + d.getDate(); };
+
+  function aggregate(tf) {
+    const out = [];
+    for (let i = 0; i < CH.m.length; i++) {
+      const b = Math.floor(CH.m[i] / tf) * tf, last = out[out.length - 1];
+      if (!last || last.m !== b) out.push({m: b, o: CH.o[i], h: CH.h[i], l: CH.l[i], c: CH.c[i], v: CH.v[i], d: CH.d[i]});
+      else { last.h = Math.max(last.h, CH.h[i]); last.l = Math.min(last.l, CH.l[i]); last.c = CH.c[i]; last.v += CH.v[i]; last.d += CH.d[i]; }
+    }
+    return out;
+  }
+  function pickTf() {
+    const span = st.view.x1 - st.view.x0, sel = opt("tf"), want = sel === "auto" ? (span < 240 ? 1 : span < 1800 ? 5 : 15) : +sel;
+    if (want !== st.tf || !st.candles) { st.tf = want; st.candles = aggregate(want); }
+  }
+  // BP coordinates -> this chart: base mapping (fit / points), then the BP's own move/stretch A
+  const baseP = (m, p) => opt("scale") === "fit" ? day.low + (p - m.low) / m.range * day.range : day.open + (p - m.open);
+  const tOf = (k, t) => st.ov[k].A.at * t + st.ov[k].A.bt;
+  const pOf = (k, m, p) => st.ov[k].A.ap * baseP(m, p) + st.ov[k].A.bp;
+  const vertsOf = (m, k) => (opt("detail") === "legs" ? m.legs : m.skeleton).map(v => ({t: tOf(k, v[0]), p: pOf(k, m, v[1])}));
+  const bucketT = i => i * 5 + 2.5;
+
+  let G = {};
+  function layout() {
+    const r = svg.getBoundingClientRect(), W = r.width, H = r.height, left = 8, right = 70, top = 10, gap = 5, axisH = 34;
+    const volH = Math.max(36, H * 0.09), dH = Math.max(36, H * 0.09), mH = Math.max(30, H * 0.07);
+    const axisTop = H - axisH, mTop = axisTop - mH, dTop = mTop - gap - dH, volTop = dTop - gap - volH;
+    G = {W, H, left, right, plotW: W - left - right, top, plotH: volTop - gap - top, volTop, volH, dTop, dH, mTop, mH, axisTop};
+  }
+  const X = m => G.left + (m - st.view.x0) / (st.view.x1 - st.view.x0) * G.plotW;
+  const Y = p => G.top + (st.yTop - p) / (st.yTop - st.yBot) * G.plotH;
+  const invX = x => st.view.x0 + (x - G.left) / G.plotW * (st.view.x1 - st.view.x0);
+  const invY = y => st.yTop - (y - G.top) / G.plotH * (st.yTop - st.yBot);
+  const inPlot = (x, y) => x >= G.left && x <= G.left + G.plotW && y >= G.top && y <= G.axisTop;
+  const inPrice = (x, y) => x >= G.left && x <= G.left + G.plotW && y >= G.top && y <= G.top + G.plotH;
+  const onPriceAxis = (x, y) => x > G.left + G.plotW && y >= G.top && y <= G.top + G.plotH;
+  const onTimeAxis = (x, y) => y > G.axisTop && x >= G.left && x <= G.left + G.plotW;
+
+  function fitY() {
+    if (!st.yAuto || (st.drag && (st.drag.type === "ov" || st.drag.type === "ovscale"))) return;
+    let hi = -Infinity, lo = Infinity;
+    for (let i = 0; i < CH.m.length; i++) if (CH.m[i] + 1 >= st.view.x0 && CH.m[i] <= st.view.x1) { hi = Math.max(hi, CH.h[i]); lo = Math.min(lo, CH.l[i]); }
+    day.matches.forEach((m, k) => { if (st.ov[k].on) vertsOf(m, k).forEach(v => { if (v.t >= st.view.x0 && v.t <= st.view.x1) { hi = Math.max(hi, v.p); lo = Math.min(lo, v.p); } }); });
+    if (!isFinite(hi)) return;
+    const pad = Math.max(5, (hi - lo) * 0.06); st.yTop = hi + pad; st.yBot = lo - pad;
+  }
+
+  function render() {
+    layout();
+    if (G.plotW <= 0 || G.plotH <= 0) return;      // not laid out yet (first ResizeObserver tick)
+    pickTf(); fitY();
+    svg.innerHTML = "";
+    el("rect", {x: 0, y: 0, width: G.W, height: G.H, fill: "#0f1115"}, svg);
+    const defs = el("defs", {}, svg);
+    const clip = (name, y, h) => el("rect", {x: G.left, y, width: G.plotW, height: h}, el("clipPath", {id: sid + name}, defs));
+    clip("p", G.top, G.plotH); clip("v", G.volTop, G.volH); clip("d", G.dTop, G.dH); clip("m", G.mTop, G.mH);
+    el("rect", {x: G.left + G.plotW, y: G.top, width: G.right, height: G.plotH, fill: "#12151c", style: "cursor:ns-resize"}, svg);
+    el("rect", {x: G.left, y: G.axisTop, width: G.plotW, height: G.H - G.axisTop, fill: "#12151c", style: "cursor:ew-resize"}, svg);
+    for (const [y, h] of [[G.volTop, G.volH], [G.dTop, G.dH], [G.mTop, G.mH]]) el("rect", {x: G.left, y, width: G.plotW, height: h, fill: "none", stroke: "#1f2430"}, svg);
+    el("line", {x1: G.left, x2: G.left + G.plotW, y1: G.dTop + G.dH / 2, y2: G.dTop + G.dH / 2, stroke: "#2a2f3a"}, svg);
+    const pStep = niceStep(st.yTop - st.yBot, 12, [1, 2, 5, 10, 25, 50, 100, 200, 500]);
+    for (let p = Math.ceil(st.yBot / pStep) * pStep; p <= st.yTop; p += pStep) {
+      el("line", {x1: G.left, x2: G.left + G.plotW, y1: Y(p), y2: Y(p), stroke: "#1f2430"}, svg);
+      el("text", {x: G.left + G.plotW + 6, y: Y(p) + 4, fill: "#8b919c", "font-size": 11, "pointer-events": "none"}, svg).textContent = p.toFixed(0);
+    }
+    const tStep = niceStep(st.view.x1 - st.view.x0, 11, [1, 2, 5, 10, 15, 30, 60, 120, 180]);
+    for (let m = Math.ceil(st.view.x0 / tStep) * tStep; m <= st.view.x1; m += tStep) {
+      el("line", {x1: X(m), x2: X(m), y1: G.top, y2: G.axisTop, stroke: "#1a1e28"}, svg);
+      el("text", {x: X(m), y: G.axisTop + 14, fill: "#8b919c", "font-size": 11, "text-anchor": "middle", "pointer-events": "none"}, svg).textContent = clockOf(m);
+    }
+    const rth = 15.5 * 60;
+    if (rth >= st.view.x0 && rth <= st.view.x1) {
+      el("line", {x1: X(rth), x2: X(rth), y1: G.top, y2: G.axisTop, stroke: "#4b5563", "stroke-dasharray": "2 4"}, svg);
+      el("text", {x: X(rth) + 4, y: G.top + 12, fill: "#9ca3af", "font-size": 11, "pointer-events": "none"}, svg).textContent = "09:30";
+    }
+    el("text", {x: G.left + 4, y: G.axisTop + 29, fill: "#6b7280", "font-size": 11, "pointer-events": "none"}, svg).textContent = dayOf(Math.max(st.view.x0, 0));
+
+    const g = el("g", {"clip-path": `url(#${sid}p)`}, svg), gv = el("g", {"clip-path": `url(#${sid}v)`}, svg);
+    const gd = el("g", {"clip-path": `url(#${sid}d)`}, svg), gm = el("g", {"clip-path": `url(#${sid}m)`}, svg);
+    // ---- the real day
+    const vis = st.candles.filter(c => c.m + st.tf >= st.view.x0 && c.m <= st.view.x1);
+    const bw = Math.max(1, 0.7 * (X(st.tf) - X(0))), vmax = Math.max(...vis.map(c => c.v), 1);
+    const dmid = G.dTop + G.dH / 2, dY = d => dmid - Math.max(-1, Math.min(1, d / 0.5)) * (G.dH / 2 - 2);
+    for (const c of vis) {
+      const x = X(c.m + st.tf / 2), col = c.c >= c.o ? "#3ddc84" : "#ff5c5c";
+      el("line", {x1: x, x2: x, y1: Y(c.h), y2: Y(c.l), stroke: col}, g);
+      el("rect", {x: x - bw / 2, y: Y(Math.max(c.o, c.c)), width: bw, height: Math.max(1, Math.abs(Y(c.o) - Y(c.c))), fill: col}, g);
+      const vh = c.v / vmax * (G.volH - 4);
+      el("rect", {x: x - bw / 2, y: G.volTop + G.volH - vh, width: bw, height: vh, fill: c.d >= 0 ? "#1f6b45" : "#7a2b31"}, gv);
+      const dr = c.v ? c.d / c.v : 0, y1 = dY(dr);
+      el("rect", {x: x - bw / 2, y: Math.min(y1, dmid), width: bw, height: Math.max(0.5, Math.abs(y1 - dmid)), fill: dr >= 0 ? "#2f9e64" : "#c2464d"}, gd);
+    }
+    const mmaxDay = Math.max(...day.panels.mid_cross, 1), w5 = Math.max(1, 0.75 * (X(5) - X(0)));
+    day.panels.mid_cross.forEach((v, i) => {
+      const t = bucketT(i); if (t < st.view.x0 - 5 || t > st.view.x1 + 5) return;
+      const h = v / mmaxDay * (G.mH - 4); el("rect", {x: X(t) - w5 / 2, y: G.mTop + G.mH - h, width: w5, height: h, fill: "#7c6a2a"}, gm);
+    });
+    for (const [key, col, dash] of [["vw", "#c084fc", ""], ["sma", "#94a3b8", "5 4"]]) {
+      let d = "";
+      for (let i = 0; i < CH.m.length; i++) {
+        if (CH.m[i] < st.view.x0 - 5 || CH.m[i] > st.view.x1 + 5 || CH[key][i] === null) continue;
+        d += (d ? "L" : "M") + X(CH.m[i] + 0.5).toFixed(1) + "," + Y(CH[key][i]).toFixed(1);
+      }
+      el("path", {d, fill: "none", stroke: col, "stroke-width": 1.2, "stroke-dasharray": dash}, g);
+    }
+    for (const [txt, y] of [["volume", G.volTop], ["delta ratio (buy − sell) / volume", G.dTop], ["mid-point crosses / 5 min", G.mTop]])
+      el("text", {x: G.left + 4, y: y + 12, fill: "#8b919c", "font-size": 11, "pointer-events": "none"}, svg).textContent = txt;
+
+    // ---- BP overlays (3 -> 1 so #1 is on top)
+    for (let k = day.matches.length - 1; k >= 0; k--) {
+      const o = st.ov[k]; if (!o.on) continue;
+      const m = day.matches[k], col = COLORS[k], vs = vertsOf(m, k);
+      const og = el("g", {opacity: o.opacity, "clip-path": `url(#${sid}p)`}, svg);
+      if (chk("extras")) {
+        const line = (arr, fy) => arr.map((y, i) => y === null ? null : X(tOf(k, bucketT(i))).toFixed(1) + "," + fy(y).toFixed(1)).filter(Boolean).join(" ");
+        const toP = y => Y(pOf(k, m, m.low + y * m.range));
+        el("polyline", {points: line(m.panels.vwap, toP), fill: "none", stroke: col, "stroke-width": 1.2, "stroke-dasharray": "7 4"}, og);
+        el("polyline", {points: line(m.panels.sma100, toP), fill: "none", stroke: col, "stroke-width": 1, "stroke-dasharray": "2 3"}, og);
+        const vmx = Math.max(...m.panels.rel_volume, 1e-9), mmx = Math.max(...m.panels.mid_cross, 1);
+        el("polyline", {points: line(m.panels.rel_volume, v => G.volTop + G.volH - v / vmx * (G.volH - 4)), fill: "none", stroke: col, "stroke-width": 1.2, opacity: o.opacity}, gv);
+        el("polyline", {points: line(m.panels.delta_ratio, dY), fill: "none", stroke: col, "stroke-width": 1.2, opacity: o.opacity}, gd);
+        el("polyline", {points: line(m.panels.mid_cross, v => G.mTop + G.mH - v / mmx * (G.mH - 4)), fill: "none", stroke: col, "stroke-width": 1.2, opacity: o.opacity}, gm);
+      }
+      const pts = vs.map(v => X(v.t).toFixed(1) + "," + Y(v.p).toFixed(1)).join(" ");
+      el("polyline", {points: pts, fill: "none", stroke: col, "stroke-width": opt("detail") === "legs" ? 2 : 3.2, "stroke-linejoin": "round"}, og);
+      if (chk("mids")) for (let i = 0; i < vs.length - 1; i++) {
+        const mx = X((vs[i].t + vs[i + 1].t) / 2), my = Y((vs[i].p + vs[i + 1].p) / 2);
+        if (mx < G.left || mx > G.left + G.plotW) continue;
+        el("path", {d: `M${mx - 3.5},${my}L${mx},${my - 3.5}L${mx + 3.5},${my}L${mx},${my + 3.5}Z`, fill: "#0f1115", stroke: col, "stroke-width": 1.2, "pointer-events": "none"}, og);
+      }
+      const hit = el("polyline", {points: pts, fill: "none", stroke: "transparent", "stroke-width": 12, "data-ov": k}, og);
+      hit.style.cursor = "move";
+      const every = (st.view.x1 - st.view.x0) / 4; let nextT = -Infinity;
+      vs.forEach(v => {
+        if (v.t < st.view.x0 || v.t > st.view.x1 || v.t < nextT) return;
+        nextT = v.t + every;
+        el("circle", {cx: X(v.t), cy: Y(v.p), r: 8, fill: col, stroke: "#0f1115", "stroke-width": 1.5, "pointer-events": "none"}, og);
+        el("text", {x: X(v.t), y: Y(v.p) + 4, "text-anchor": "middle", "font-size": 11, "font-weight": 700, fill: "#0f1115", "pointer-events": "none"}, og).textContent = m.n;
+      });
+    }
+    if (st.drag && st.drag.type === "ovscale" && st.drag.axis && st.mouse) {
+      const A = st.ov[st.drag.k].A;
+      el("text", {x: st.mouse.x + 14, y: st.mouse.y - 10, fill: "#f8fafc", "font-size": 13, "font-weight": 700, "pointer-events": "none"}, svg).textContent =
+        `BP ${day.matches[st.drag.k].n}: ` + (st.drag.axis === "t" ? `time ×${A.at.toFixed(2)}` : `price ×${A.ap.toFixed(2)}`);
+    }
+    st.ov.forEach((o, k) => { const e = controls.querySelectorAll(".xf")[k]; if (e) e.textContent = `time ×${o.A.at.toFixed(2)} · price ×${o.A.ap.toFixed(2)}`; });
+    drawCrosshair();
+  }
+  function drawCrosshair() {
+    const old = svg.querySelector("#xh"); if (old) old.remove();
+    const p = st.mouse; if (!p || !inPlot(p.x, p.y) || (st.drag && st.drag.type === "pan")) return;
+    const g = el("g", {id: "xh", "pointer-events": "none"}, svg);
+    el("line", {x1: p.x, x2: p.x, y1: G.top, y2: G.axisTop, stroke: "#9ca3af", "stroke-dasharray": "3 3", "stroke-width": 0.8}, g);
+    const m = invX(p.x);
+    el("rect", {x: p.x - 52, y: G.axisTop + 2, width: 104, height: 18, rx: 3, fill: "#e5e7eb"}, g);
+    el("text", {x: p.x, y: G.axisTop + 15, "text-anchor": "middle", fill: "#0f1115", "font-size": 11, "font-weight": 600}, g).textContent = dayOf(m) + " " + clockOf(m);
+    if (inPrice(p.x, p.y)) {
+      el("line", {x1: G.left, x2: G.left + G.plotW, y1: p.y, y2: p.y, stroke: "#9ca3af", "stroke-dasharray": "3 3", "stroke-width": 0.8}, g);
+      el("rect", {x: G.left + G.plotW + 1, y: p.y - 9, width: G.right - 2, height: 18, rx: 3, fill: "#e5e7eb"}, g);
+      el("text", {x: G.left + G.plotW + 6, y: p.y + 4, fill: "#0f1115", "font-size": 11, "font-weight": 600}, g).textContent = invY(p.y).toFixed(2);
+    }
+  }
+
+  const local = e => { const r = svg.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; };
+  svg.addEventListener("pointerdown", e => {
+    const p = local(e), L = st.lastDown, dbl = e.timeStamp - L.t < 400 && Math.abs(p.x - L.x) < 6 && Math.abs(p.y - L.y) < 6;
+    st.lastDown = {t: e.timeStamp, x: p.x, y: p.y};
+    if (dbl && onPriceAxis(p.x, p.y)) { st.yAuto = true; st.drag = null; render(); return; }
+    if (dbl && onTimeAxis(p.x, p.y)) { st.view = {x0: -10, x1: END + 10}; st.drag = null; render(); return; }
+    const ok = e.target.getAttribute("data-ov");
+    if (ok !== null && dbl) {
+      const k = +ok, vs = vertsOf(day.matches[k], k), ts = vs.map(v => v.t), ps = vs.map(v => v.p);
+      const c = {t: (Math.min(...ts) + Math.max(...ts)) / 2, p: (Math.min(...ps) + Math.max(...ps)) / 2};
+      st.drag = {type: "ovscale", k, x: p.x, y: p.y, cx: X(c.t), cy: Y(c.p), c, A0: {...st.ov[k].A}, axis: null};
+    }
+    else if (ok !== null) st.drag = {type: "ov", k: +ok, x: p.x, y: p.y, A0: {...st.ov[+ok].A}};
+    else if (onPriceAxis(p.x, p.y)) { st.drag = {type: "y", y: p.y, top: st.yTop, bot: st.yBot}; st.yAuto = false; }
+    else if (onTimeAxis(p.x, p.y)) st.drag = {type: "x", x: p.x, x0: st.view.x0, x1: st.view.x1};
+    else if (inPlot(p.x, p.y)) st.drag = {type: "pan", x: p.x, y: p.y, x0: st.view.x0, x1: st.view.x1, top: st.yTop, bot: st.yBot};
+    else return;
+    svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener("pointermove", e => {
+    const p = local(e); st.mouse = p; const d = st.drag;
+    if (!d) { drawCrosshair(); return; }
+    if (d.type === "ov") st.ov[d.k].A = {...d.A0, bt: d.A0.bt + invX(p.x) - invX(d.x), bp: d.A0.bp + Math.round((invY(p.y) - invY(d.y)) * 4) / 4};
+    else if (d.type === "ovscale") {
+      const dx = p.x - d.x, dy = p.y - d.y;
+      if (!d.axis && Math.max(Math.abs(dx), Math.abs(dy)) > 6) d.axis = Math.abs(dx) >= Math.abs(dy) ? "t" : "p";
+      if (d.axis === "t") {
+        const out = Math.sign((d.x - d.cx) * dx) || 1, f = Math.min(5 / d.A0.at, Math.max(0.2 / d.A0.at, Math.exp(out * Math.abs(dx) * 0.005)));
+        st.ov[d.k].A = {...d.A0, at: d.A0.at * f, bt: d.c.t + (d.A0.bt - d.c.t) * f};
+      } else if (d.axis === "p") {
+        const out = Math.sign((d.y - d.cy) * dy) || 1, f = Math.min(5 / d.A0.ap, Math.max(0.2 / d.A0.ap, Math.exp(out * Math.abs(dy) * 0.005)));
+        st.ov[d.k].A = {...d.A0, ap: d.A0.ap * f, bp: d.c.p + (d.A0.bp - d.c.p) * f};
+      }
+    }
+    else if (d.type === "y") { const f = Math.exp((p.y - d.y) * 0.006), mid = (d.top + d.bot) / 2, h = (d.top - d.bot) / 2 * f; st.yTop = mid + h; st.yBot = mid - h; }
+    else if (d.type === "x") { const f = Math.exp(-(p.x - d.x) * 0.006), mid = (d.x0 + d.x1) / 2, h = Math.max(5, (d.x1 - d.x0) / 2 * f); st.view = {x0: mid - h, x1: mid + h}; }
+    else if (d.type === "pan") {
+      const dm = (p.x - d.x) / G.plotW * (d.x1 - d.x0); st.view = {x0: d.x0 - dm, x1: d.x1 - dm};
+      if (!st.yAuto) { const dp = (p.y - d.y) / G.plotH * (d.top - d.bot); st.yTop = d.top + dp; st.yBot = d.bot + dp; }
+    }
+    render();
+  });
+  svg.addEventListener("pointerup", () => { st.drag = null; render(); });
+  svg.addEventListener("pointerleave", () => { st.mouse = null; drawCrosshair(); });
+  svg.addEventListener("wheel", e => {
+    e.preventDefault();
+    const p = local(e), m = invX(p.x), f = e.deltaY > 0 ? 1.2 : 1 / 1.2, span = Math.min(END + 60, Math.max(5, (st.view.x1 - st.view.x0) * f));
+    const fr = (m - st.view.x0) / (st.view.x1 - st.view.x0); st.view = {x0: m - fr * span, x1: m - fr * span + span}; render();
+  }, {passive: false});
+
+  day.matches.forEach((m, k) => {
+    const tr = m.track && m.track.used ? `track record: ${m.track.hits}/${m.track.used} hits (${m.track.success_pct}%)` : "track record: not used yet";
+    const box = document.createElement("div"); box.className = "match";
+    box.innerHTML = `<span class="badge" style="background:${COLORS[k]}" title="turn BP ${m.n} on/off">${m.n}</span>
+      <div class="info"><span class="pct" style="color:${COLORS[k]}">${m.match_pct.toFixed(0)}% match</span> · <b>${m.date}</b> ${m.weekday.slice(0, 3)} · ${m.contract}<br>
+      <span class="tag ${m.session_type}">${m.session_type.replace("_", " ")}</span> RTH <span class="tag ${m.rth_type}">${m.rth_type.replace("_", " ")}</span>
+      <span class="hint">${m.story.replace(/_/g, " ").toLowerCase()} · ${m.range.toFixed(0)} pts</span><br>
+      <span class="hint">${tr} · <span class="xf"></span></span></div>
+      <label class="hint">opacity <input type="range" min="0" max="100" value="70"> <span class="ov">70%</span></label>
+      <button title="reset this BP's position and stretch">↺</button>`;
+    box.querySelector(".badge").onclick = () => { st.ov[k].on = !st.ov[k].on; box.classList.toggle("off", !st.ov[k].on); render(); };
+    const sl = box.querySelector("input");
+    sl.oninput = () => { st.ov[k].opacity = sl.value / 100; box.querySelector(".ov").textContent = sl.value + "%"; render(); };
+    box.querySelector("button").onclick = () => { st.ov[k].A = ID(); render(); };
+    controls.appendChild(box);
+  });
+  const rb = document.createElement("button"); rb.textContent = "Reset all BPs";
+  rb.onclick = () => { st.ov.forEach(o => o.A = ID()); render(); };
+  controls.appendChild(rb);
+  new ResizeObserver(render).observe(host);
+  return {render, st};
+}
+
+const root = document.getElementById("days");
+DAYS.forEach(day => {
+  const sec = document.createElement("section");
+  const preds = day.predictions || [];
+  const hits = preds.filter(p => p.hit).length;
+  sec.innerHTML = `<div class="dayhead"><h2>${day.weekday} ${day.date} · ${day.contract}</h2>
+    <span><span class="tag ${day.session_type}">SESSION ${day.session_type.replace("_", " ")}</span>
+    <span class="tag ${day.rth_type}">RTH ${day.rth_type.replace("_", " ")}</span></span>
+    <span class="hint">${day.story.replace(/_/g, " ").toLowerCase()} · phases ${day.phases} · range ${day.range.toFixed(0)} pts
+    · these 3 = closest whole-day shapes among ${day.n_candidates} earlier ${day.family} days</span></div>
+    <div class="mrow"></div><div class="chartbox"></div>
+    <details><summary>Predictions logged for this day (walk-forward: at each time, only earlier days and only data up to that time) — ${hits} of ${preds.length} hit</summary>
+    <table><tr><th>as of</th><th>#</th><th>matched BP</th><th>match %</th><th>predicted rest of day</th><th>actual rest of day</th><th></th></tr>
+    ${preds.map(p => `<tr><td>${p.as_of}</td><td>${p.rank}</td><td>${p.bp_date}</td><td>${p.match_pct.toFixed(0)}%</td>
+      <td>${p.predicted_dir.toLowerCase()} ${p.predicted_move_pts > 0 ? "+" : ""}${p.predicted_move_pts.toFixed(0)} pts</td>
+      <td>${p.actual_dir.toLowerCase()} ${p.actual_move_pts > 0 ? "+" : ""}${p.actual_move_pts.toFixed(0)} pts</td>
+      <td style="color:${p.hit ? "#3ddc84" : "#ff5c5c"}">${p.hit ? "hit" : "miss"}</td></tr>`).join("")}</table></details>`;
+  root.appendChild(sec);
+  charts.push(makeChart(day, sec.querySelector(".chartbox"), sec.querySelector(".mrow")));
+});
+for (const id of ["detail", "scale", "tf", "extras", "mids"]) document.getElementById(id).addEventListener("change", () => charts.forEach(c => c.render()));
+</script>
+</body>
+</html>

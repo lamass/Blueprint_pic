@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blueprint Overlay</title>
+<style>
+  :root { --bg:#0f1115; --panel:#151821; --line:#2a2f3a; --text:#d8dbe2; --muted:#8b919c; --up:#3ddc84; --down:#ff5c5c; --warn:#f59e0b; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;
+         height:100vh; display:flex; flex-direction:column; }
+  header { display:flex; flex-wrap:wrap; gap:12px 14px; align-items:center; padding:9px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:14px; margin:0 6px 0 0; font-weight:600; }
+  header label { display:flex; align-items:center; gap:6px; color:var(--muted); }
+  header button { background:#232836; color:var(--text); border:1px solid #3a4152; border-radius:6px; padding:5px 11px; cursor:pointer; font:inherit; }
+  header button:hover { background:#2c3344; }
+  #status { color:var(--muted); width:100%; }
+  main { display:flex; flex:1; min-height:0; }
+  #chartWrap { flex:1; position:relative; min-width:0; }
+  svg { display:block; width:100%; height:100%; user-select:none; touch-action:none; }
+  aside { width:340px; border-left:1px solid var(--line); background:var(--panel); padding:12px 14px; overflow:auto; }
+  aside h2 { font-size:12px; margin:14px 0 6px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  aside h2:first-child { margin-top:0; }
+  table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; }
+  td { padding:2px 0; vertical-align:top; } td:first-child { color:var(--muted); width:50%; }
+  .tag { display:inline-block; padding:1px 7px; border-radius:10px; font-weight:600; font-size:12px; }
+  .tag.UP { background:#123d26; color:var(--up); } .tag.DOWN { background:#431a1d; color:var(--down); }
+  .hint { color:var(--muted); font-size:12px; } .hint b { color:var(--text); font-weight:600; }
+  .warn { color:var(--warn); }
+  .dsbtn { margin-top:6px; background:#232836; color:#d8dbe2; border:1px solid #3a4152; border-radius:6px; padding:3px 10px; cursor:pointer; font:inherit; }
+  #dsRows td { width:auto; padding:2px 6px 2px 0; }
+  #dsRows input[type=number] { width:64px; background:#0f1115; color:#d8dbe2; border:1px solid #3a4152; border-radius:4px; padding:2px 4px; }
+  #dsRows input[type=color] { width:30px; height:22px; border:none; background:none; padding:0; }
+  #dsRows button { background:none; border:none; color:#8b919c; cursor:pointer; font-size:15px; }
+  @media (max-width:800px) { main { flex-direction:column; } #chartWrap { height:70vh; } aside { width:auto; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Blueprint</h1>
+  <label>BP opacity <input id="opacity" type="range" min="0" max="100" value="75"> <span id="opv">75%</span></label>
+  <label><input id="showBP" type="checkbox" checked> show BP</label>
+  <label><input id="showGhost" type="checkbox" checked> show original under edits</label>
+  <label><input id="showMid" type="checkbox" checked> leg mid-points</label>
+  <label><input id="showExtras" type="checkbox" checked> BP's VWAP/SMA + panels</label>
+  <label><input id="showDSMA" type="checkbox" checked> delta SMAs</label>
+  <label><input id="showDTri" type="checkbox" checked> Δ triangles</label>
+  <label>candles <select id="tf"><option value="auto" selected>auto</option><option value="1">1 min</option><option value="5">5 min</option><option value="15">15 min</option></select></label>
+  <button id="resetJoints">Reset joints</button>
+  <button id="resetBP">Reset BP (all)</button>
+  <button id="toBP">Go to BP</button>
+  <button id="fitAll">Fit all days</button>
+  <span id="status"></span>
+</header>
+<main>
+  <div id="chartWrap"><svg id="svg"></svg></div>
+  <aside>
+    <h2>Blueprint</h2><div id="meta"></div>
+    <h2>Leg <span id="legNo"></span></h2><div id="leg"><span class="hint">Hover a BP leg (click it to pin).</span></div>
+    <div id="dsmaBox" style="display:none">
+      <h2>cd moving averages</h2>
+      <div class="hint" style="margin-bottom:6px">Your own SMAs of the cumulative delta. Change a period and the chart updates;
+        tick △ to mark where that SMA crosses 0. Settings are remembered in this browser.</div>
+      <label class="hint">periods in <select id="dsUnit"><option value="candles">candles (follows candle size)</option><option value="minutes">minutes (fixed)</option></select></label>
+      <table id="dsRows" style="margin-top:6px"></table>
+      <label class="hint" style="display:block;margin-top:4px"><input id="dsXover" type="checkbox" checked> △ when 1st SMA crosses 2nd (thick hollow, also on price)</label>
+      <button id="dsAdd" class="dsbtn">+ add SMA</button> <button id="dsReset" class="dsbtn">defaults</button>
+    </div>
+    <h2>Controls</h2>
+    <div class="hint">
+      <b>Move the whole BP:</b> drag any BP line.<br>
+      <b>Stretch / squeeze the whole BP:</b> double-click a BP line and keep the button down, then drag:
+      sideways away from the BP's centre = wider in time, towards it = narrower; up/down away from the centre = taller in price,
+      towards it = flatter. All legs, the BP's VWAP/SMA and its panels follow.<br>
+      <b>Adjust one joining point:</b> drag the white dot. Dashed box = its allowance (amber = outside).<br>
+      <b>Price axis:</b> drag up/down on the price labels to stretch/squeeze; double-click it for auto-fit.<br>
+      <b>Time axis:</b> drag left/right on the time labels to stretch/squeeze; double-click it to fit all days.<br>
+      <b>Zoom:</b> mouse wheel. <b>Pan:</b> drag the background.<br>
+      <b>Reset joints</b> keeps the BP where you moved it; <b>Reset BP (all)</b> puts it back on its own day.
+      The stored original is never changed.</div>
+  </aside>
+</main>
+<script>
+const BP = /*__BP__*/null;
+const CH = /*__CHART__*/null;
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("svg");
+const M = BP.meta;
+const T0 = Date.parse(CH.start.replace(" ", "T"));
+const END = CH.m[CH.m.length - 1] + 1;
+document.getElementById("title").textContent = `${M.id} on ${CH.desc}`;
+
+// ---- BP state. ORIG = original joints placed on its own day (chart minutes). Never modified.
+const ORIG = [{t: BP.legs[0].t0, p: BP.legs[0].p0}].concat(BP.legs.map(l => ({t: l.t1, p: l.p1})))
+  .map(v => ({t: v.t + CH.bp_offset, p: v.p}));
+// whole-BP placement as an affine map of the original: t' = at*t + bt, p' = ap*p + bp
+// (moving changes bt/bp; double-click-drag stretching changes at/ap around the BP's centre)
+let A = {at: 1, bt: 0, ap: 1, bp: 0};
+let verts = ORIG.map(v => ({...v}));            // current joints (= ORIG placed by A + per-joint edits)
+const place = v => ({t: A.at * v.t + A.bt, p: A.ap * v.p + A.bp});
+const home = () => ORIG.map(place);
+// the BP's own 5-min panels (delta, mid-point crosses, VWAP, SMA100), positioned on the chart like the BP
+const PN = BP.panels || null;
+const panelT = i => A.at * (CH.bp_offset + i * 5 + 2.5) + A.bt;
+const panelP = y => A.ap * (M.low + y * M.range) + A.bp;
+
+let view = {x0: CH.bp_offset - 30, x1: CH.bp_offset + M.minutes + 30};
+let yAuto = true, yTop = 0, yBot = 1;
+let selLeg = null, pinned = false, hoverVertex = null, mouse = null, drag = null;
+
+// ---- candles
+function aggregate(tf) {
+  const out = [];
+  for (let i = 0; i < CH.m.length; i++) {
+    const b = Math.floor(CH.m[i] / tf) * tf, last = out[out.length - 1];
+    if (!last || last.m !== b) out.push({m: b, o: CH.o[i], h: CH.h[i], l: CH.l[i], c: CH.c[i], v: CH.v[i], d: CH.d[i]});
+    else { last.h = Math.max(last.h, CH.h[i]); last.l = Math.min(last.l, CH.l[i]); last.c = CH.c[i]; last.v += CH.v[i]; last.d += CH.d[i]; }
+  }
+  return out;
+}
+let tfSel = "auto", tf = 5, candles = aggregate(tf);
+function pickTf() {
+  const span = view.x1 - view.x0;
+  const want = tfSel === "auto" ? (span < 240 ? 1 : span < 1800 ? 5 : 15) : +tfSel;
+  if (want !== tf) { tf = want; candles = aggregate(tf); }
+}
+
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const clockOf = m => { const d = new Date(T0 + m * 60000); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+const dayOf = m => { const d = new Date(T0 + m * 60000); return DAYS[d.getDay()] + " " + (d.getMonth() + 1) + "/" + d.getDate(); };
+const fmt = (x, d = 2) => (x === null || x === undefined) ? "—" : Number(x).toFixed(d);
+const sgn = x => (x >= 0 ? "+" : "") ;
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
+
+// ---- allowance: proposed flexibility per joining point, relative to where the whole BP currently sits
+function allowance(k) {
+  const durs = [], sizes = [];
+  if (k > 0) { durs.push(ORIG[k].t - ORIG[k - 1].t); sizes.push(Math.abs(ORIG[k].p - ORIG[k - 1].p)); }
+  if (k < ORIG.length - 1) { durs.push(ORIG[k + 1].t - ORIG[k].t); sizes.push(Math.abs(ORIG[k + 1].p - ORIG[k].p)); }
+  return {dt: Math.max(1, 0.25 * Math.min(...durs)) * A.at, dp: Math.max(5, 0.25 * Math.min(...sizes)) * A.ap};
+}
+const outside = k => { const a = allowance(k), h = home()[k]; return Math.abs(verts[k].t - h.t) > a.dt + 1e-6 || Math.abs(verts[k].p - h.p) > a.dp + 1e-6; };
+const flipped = k => Math.sign(verts[k + 1].p - verts[k].p) !== Math.sign(ORIG[k + 1].p - ORIG[k].p);
+
+// ---- geometry
+let G = {};
+function layout() {
+  const r = svg.getBoundingClientRect();
+  const W = r.width, H = r.height, left = (PN && PN.cum_delta) ? 62 : 8, right = 70, top = 10, gap = 5, axisH = 34;
+  // panels under the price: volume, delta ratio, mid-point crosses (same as the first BP picture)
+  // every panel is a FIXED SHARE of the chart height (no pixel minimums), so resizing the window scales price,
+  // volume, delta and mid-point panels by the same factor and they stay congruent with each other
+  const avail = H - top - axisH - 3 * gap;
+  const fr = PN && PN.cum_delta ? {p: 0.45, v: 0.10, d: 0.45, m: 0}        // price and delta 50/50, no mid-point panel
+                                : {p: 0.64, v: 0.13, d: 0.13, m: 0.10};
+  const plotH = avail * fr.p, volH = avail * fr.v, dH = avail * fr.d, mH = avail * fr.m;
+  const volTop = top + plotH + gap, dTop = volTop + volH + gap, mTop = dTop + dH + gap, axisTop = mTop + mH;
+  G = {W, H, left, right, plotW: W - left - right, top, plotH, volTop, volH, dTop, dH, mTop, mH, axisTop};
+}
+const X = m => G.left + (m - view.x0) / (view.x1 - view.x0) * G.plotW;
+const Y = p => G.top + (yTop - p) / (yTop - yBot) * G.plotH;
+const invX = x => view.x0 + (x - G.left) / G.plotW * (view.x1 - view.x0);
+const invY = y => yTop - (y - G.top) / G.plotH * (yTop - yBot);
+const inPrice = (x, y) => x >= G.left && x <= G.left + G.plotW && y >= G.top && y <= G.top + G.plotH;
+const inPlot = (x, y) => x >= G.left && x <= G.left + G.plotW && y >= G.top && y <= G.axisTop;
+const onPriceAxis = (x, y) => x > G.left + G.plotW && y >= G.top && y <= G.top + G.plotH;
+const onTimeAxis = (x, y) => y > G.axisTop && x >= G.left && x <= G.left + G.plotW;
+
+function fitY() {
+  if (!yAuto || (drag && (drag.type === "vertex" || drag.type === "bp" || drag.type === "bpscale"))) return;
+  let hi = -Infinity, lo = Infinity;
+  for (let i = 0; i < CH.m.length; i++) if (CH.m[i] + 1 >= view.x0 && CH.m[i] <= view.x1) { hi = Math.max(hi, CH.h[i]); lo = Math.min(lo, CH.l[i]); }
+  if (document.getElementById("showBP").checked) verts.forEach(v => { if (v.t >= view.x0 && v.t <= view.x1) { hi = Math.max(hi, v.p); lo = Math.min(lo, v.p); } });
+  if (!isFinite(hi)) return;
+  const pad = Math.max(5, (hi - lo) * 0.08); yTop = hi + pad; yBot = lo - pad;
+}
+function niceStep(span, target, steps) { for (const s of steps) if (span / s <= target) return s; return steps[steps.length - 1]; }
+
+function render() {
+  layout(); pickTf(); fitY();
+  svg.innerHTML = "";
+  el("rect", {x: 0, y: 0, width: G.W, height: G.H, fill: "#0f1115"});
+  const defs = el("defs", {});
+  el("rect", {x: G.left, y: G.top, width: G.plotW, height: G.plotH}, el("clipPath", {id: "plotClip"}, defs));
+  el("rect", {x: G.left, y: G.volTop, width: G.plotW, height: G.volH}, el("clipPath", {id: "volClip"}, defs));
+
+  // axes backgrounds (so they read as handles)
+  el("rect", {x: G.left + G.plotW, y: G.top, width: G.right, height: G.plotH, fill: "#12151c", style: "cursor:ns-resize"});
+  el("rect", {x: G.left, y: G.axisTop, width: G.plotW, height: G.H - G.axisTop, fill: "#12151c", style: "cursor:ew-resize"});
+
+  // price grid
+  const pStep = niceStep(yTop - yBot, 12, [1, 2, 5, 10, 25, 50, 100, 200, 500]);
+  for (let p = Math.ceil(yBot / pStep) * pStep; p <= yTop; p += pStep) {
+    el("line", {x1: G.left, x2: G.left + G.plotW, y1: Y(p), y2: Y(p), stroke: "#1f2430"});
+    el("text", {x: G.left + G.plotW + 6, y: Y(p) + 4, fill: "#8b919c", "font-size": 11, "pointer-events": "none"}).textContent = p.toFixed(pStep < 1 ? 2 : 0);
+  }
+  // time grid
+  const tStep = niceStep(view.x1 - view.x0, 11, [1, 2, 5, 10, 15, 30, 60, 120, 180, 360, 720]);
+  for (let m = Math.ceil(view.x0 / tStep) * tStep; m <= view.x1; m += tStep) {
+    el("line", {x1: X(m), x2: X(m), y1: G.top, y2: G.axisTop, stroke: "#1a1e28"});
+    el("text", {x: X(m), y: G.axisTop + 14, fill: "#8b919c", "font-size": 11, "text-anchor": "middle", "pointer-events": "none"}).textContent = clockOf(m);
+  }
+  // session separators (18:00) with the trading day
+  for (const s of CH.sessions) {
+    if (s.m < view.x0 - 1 || s.m > view.x1) continue;
+    el("line", {x1: X(s.m), x2: X(s.m), y1: G.top, y2: G.axisTop, stroke: "#4b5563", "stroke-dasharray": "2 4"});
+    el("text", {x: X(s.m) + 5, y: G.top + 13, fill: "#9ca3af", "font-size": 12, "font-weight": 600, "pointer-events": "none"}).textContent = s.label;
+  }
+  if (view.x1 - view.x0 > 0) el("text", {x: G.left + 4, y: G.axisTop + 29, fill: "#6b7280", "font-size": 11, "pointer-events": "none"}).textContent = dayOf(Math.max(view.x0, 0));
+
+  // candles + volume
+  el("rect", {x: G.left, y: G.dTop, width: G.plotW, height: G.dH}, el("clipPath", {id: "dClip"}, defs));
+  el("rect", {x: G.left, y: G.mTop, width: G.plotW, height: G.mH}, el("clipPath", {id: "mClip"}, defs));
+  for (const [y, h] of [[G.volTop, G.volH], [G.dTop, G.dH], [G.mTop, G.mH]])
+    el("rect", {x: G.left, y, width: G.plotW, height: h, fill: "none", stroke: "#1f2430"});
+  el("line", {x1: G.left, x2: G.left + G.plotW, y1: G.dTop + G.dH / 2, y2: G.dTop + G.dH / 2, stroke: "#2a2f3a"});
+  const g = el("g", {"clip-path": "url(#plotClip)"}), gv = el("g", {"clip-path": "url(#volClip)"});
+  const gd = el("g", {"clip-path": "url(#dClip)"}), gm = el("g", {"clip-path": "url(#mClip)"});
+  // mid-point crosses per 5 min of the real day (stored with this day's BP)
+  if (PN && G.mH >= 1) {          // the mid-point panel is dropped on cumulative-delta pages
+    const mmax = Math.max(...PN.mid_cross, 1), w5 = Math.max(1, 0.75 * (X(5) - X(0)));
+    PN.mid_cross.forEach((v, i) => {
+      const t = CH.bp_offset + i * 5 + 2.5; if (t < view.x0 - 5 || t > view.x1 + 5) return;
+      const h = v / mmax * (G.mH - 4);
+      el("rect", {x: X(t) - w5 / 2, y: G.mTop + G.mH - h, width: w5, height: h, fill: "#a1862f"}, gm);
+    });
+  }
+  el("text", {x: G.left + 4, y: G.dTop + 12, fill: "#8b919c", "font-size": 11, "pointer-events": "none"}).textContent = PN && PN.cum_delta
+    ? "shared zero = middle line · above = more aggressive buying, below = more selling · bars: delta per candle, buy − sell contracts (LEFT axis) · white: cumulative delta since 18:00 (RIGHT axis, contracts) · dashed amber: the BP's cumulative delta"
+    : "delta ratio (buy − sell) / volume";
+  if (G.mH >= 1) el("text", {x: G.left + 4, y: G.mTop + 12, fill: "#8b919c", "font-size": 11, "pointer-events": "none"}).textContent = "mid-point crosses / 5 min";
+  const vis = candles.filter(c => c.m + tf >= view.x0 && c.m <= view.x1);
+  const bw = Math.max(1, 0.7 * (X(tf) - X(0)));
+  const CDM = !!(PN && PN.cum_delta), dMid = G.dTop + G.dH / 2, half = G.dH / 2;
+  // bar scale: contracts per candle on cum-delta pages (symmetric around the shared zero), else ratio ±0.5
+  G.barSpan = CDM ? Math.max(1, ...vis.map(c => Math.abs(c.d))) * 1.1 : 0.5;
+  const vmax = Math.max(...vis.map(c => c.v), 1);
+  for (const c of vis) {
+    const x = X(c.m + tf / 2), col = c.c >= c.o ? "#3ddc84" : "#ff5c5c";
+    el("line", {x1: x, x2: x, y1: Y(c.h), y2: Y(c.l), stroke: col}, g);
+    el("rect", {x: x - bw / 2, y: Y(Math.max(c.o, c.c)), width: bw, height: Math.max(1, Math.abs(Y(c.o) - Y(c.c))), fill: col}, g);
+    const vh = c.v / vmax * (G.volH - 4);
+    el("rect", {x: x - bw / 2, y: G.volTop + G.volH - vh, width: bw, height: vh, fill: c.d >= 0 ? "#1f6b45" : "#7a2b31"}, gv);
+    // delta ratio of this candle = (buy - sell) / volume
+    const dv = CDM ? c.d : (c.v ? c.d / c.v : 0), dh = Math.min(1, Math.abs(dv) / G.barSpan) * half;
+    el("rect", {x: x - bw / 2, y: dv >= 0 ? dMid - dh : dMid, width: bw, height: Math.max(0.5, dh), fill: dv >= 0 ? "#3ddc84" : "#ff5c5c",
+                "fill-opacity": CDM && document.getElementById("showDSMA").checked ? 0.5 : 1}, gd);
+  }
+  el("text", {x: G.left + 4, y: G.volTop + 12, fill: "#8b919c", "font-size": 11, "pointer-events": "none"}).textContent = "volume (green = more buying, red = more selling)";
+  // ---- cumulative delta (only when this page carries it): running total of buy - sell contracts since 18:00
+  if (PN && PN.cum_delta) {
+    const real = [];
+    let cum = 0;
+    for (let i = 0; i < CH.m.length; i++) {
+      if (CH.sessions.some(s => s.m > (i ? CH.m[i - 1] : -1) && s.m <= CH.m[i])) cum = 0;   // restart each 18:00
+      cum += CH.d[i]; real.push([CH.m[i] + 1, cum]);
+    }
+    const bpc = PN.cum_delta.map((y, i) => [panelT(i), y * PN.cum_delta_max_abs]);
+    const visV = real.filter(p => p[0] >= view.x0 && p[0] <= view.x1).map(p => p[1])
+      .concat(document.getElementById("showBP").checked ? bpc.filter(p => p[0] >= view.x0 && p[0] <= view.x1).map(p => p[1]) : []);
+    if (visV.length) {
+      // ONE shared zero: symmetric axes, so cumulative delta 0 = bar delta 0 = the panel's middle line.
+      // Pure proportional mapping (no pixel insets) so the panel scales exactly with the window.
+      G.cumSpan = Math.max(1, ...visV.map(Math.abs)) * 1.08;
+      const cy = v => dMid - v / G.cumSpan * half;
+      const nice = span => { const raw = span / 2.2, p = Math.pow(10, Math.floor(Math.log10(raw))); return [1, 2, 2.5, 5, 10].map(m => m * p).find(st => st >= raw); };
+      const fmtK = v => Math.abs(v) >= 1000 ? (v / 1000).toFixed(Math.abs(v) % 1000 ? 1 : 0) + "k" : v.toFixed(0);
+      const cs = nice(G.cumSpan), bs = nice(G.barSpan);
+      for (let v = -Math.floor(G.cumSpan / cs) * cs; v <= G.cumSpan; v += cs) {
+        if (v !== 0) el("line", {x1: G.left, x2: G.left + G.plotW, y1: cy(v), y2: cy(v), stroke: "#1f2430", "stroke-dasharray": "2 4"}, gd);
+        el("text", {x: G.left + G.plotW + 6, y: cy(v) + 4, fill: "#e5e7eb", "font-size": 10, "pointer-events": "none"}).textContent = (v > 0 ? "+" : "") + fmtK(v);
+      }
+      for (let v = -Math.floor(G.barSpan / bs) * bs; v <= G.barSpan; v += bs)
+        el("text", {x: G.left - 5, y: dMid - v / G.barSpan * half + 4, fill: "#86efac", "font-size": 10, "text-anchor": "end", "pointer-events": "none"}).textContent = (v > 0 ? "+" : "") + fmtK(v);
+      el("text", {x: G.left + G.plotW + 6, y: G.dTop - 1, fill: "#8b919c", "font-size": 9, "pointer-events": "none"}).textContent = "cum Δ";
+      el("text", {x: G.left - 5, y: G.dTop - 1, fill: "#8b919c", "font-size": 9, "text-anchor": "end", "pointer-events": "none"}).textContent = "bar Δ";
+      // ---- experiment: the user's own SMAs of the cumulative delta (cd), set in the side panel (DS), + triangles
+      if (document.getElementById("showDSMA").checked || document.getElementById("showDTri").checked) {
+        const cs = candles, cumC = [];
+        let run = 0;
+        for (let i = 0; i < cs.length; i++) {
+          if (CH.sessions.some(se => se.m > (i ? cs[i - 1].m : -1) && se.m <= cs[i].m)) run = 0;
+          run += cs[i].d; cumC.push(run);
+        }
+        const sma = (arr, n) => { const out = new Array(arr.length).fill(null); let sum = 0;
+          for (let i = 0; i < arr.length; i++) { sum += arr[i]; if (i >= n) sum -= arr[i - n]; if (i >= n - 1) out[i] = sum / n; } return out; };
+        const tri = (x, y, up, filled, size, parent, col) => {
+          const d = up ? `M${x},${y - size}L${x + size},${y + size * 0.8}L${x - size},${y + size * 0.8}Z` : `M${x},${y + size}L${x + size},${y - size * 0.8}L${x - size},${y - size * 0.8}Z`;
+          col = col || (up ? "#22c55e" : "#ef4444");
+          el("path", {d, fill: filled ? col : "#0f1115", stroke: filled ? "#f8fafc" : col, "stroke-width": filled ? 1.2 : 2, "pointer-events": "none"}, parent);
+        };
+        const candleAt = t => {                       // the candle whose time span contains minute t
+          let lo = 0, hi = cs.length - 1;
+          while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (cs[mid].m < t) lo = mid; else hi = mid - 1; }
+          return cs[lo];
+        };
+        const showTri = document.getElementById("showDTri").checked;
+        const minutes = DS.unit === "minutes";
+        // the series an SMA is taken over: cd at every candle close (candles) or cd every minute (minutes)
+        const base = minutes ? real.map(p => ({t: p[0], v: p[1]})) : cs.map((c, i) => ({t: c.m + tf, v: cumC[i]}));
+        const legend = [["cd", "#f8fafc"]];
+        G.smaCrosses = [];
+        const active = [];                                     // [{row, vals}] in editor order
+        DS.rows.forEach((r, ri) => {
+          const per = Math.round(+r.p);
+          if (!r.on || !(per >= 1)) return;
+          const vals = sma(base.map(b => b.v), per);
+          active.push({r, vals});
+          legend.push([`   SMA ${per}${minutes ? " min" : ""}`, r.col]);
+          if (document.getElementById("showDSMA").checked) {
+            let d = "";
+            vals.forEach((v, i) => { if (v === null || base[i].t < view.x0 - 15 || base[i].t > view.x1 + 15) return;
+              d += (d ? "L" : "M") + X(base[i].t).toFixed(1) + "," + cy(v).toFixed(1); });
+            el("path", {d, fill: "none", stroke: r.col, "stroke-width": 1.6}, gd);
+          }
+          if (r.tri) for (let i = 1; i < vals.length; i++) {            // hollow triangle in the SMA's colour where it crosses 0
+            if (vals[i - 1] === null || vals[i] === null) continue;
+            const up = vals[i - 1] <= 0 && vals[i] > 0, dn = vals[i - 1] >= 0 && vals[i] < 0;
+            if (!up && !dn) continue;
+            G.smaCrosses.push({row: ri, t: base[i].t, up});
+            if (!showTri || base[i].t < view.x0 || base[i].t > view.x1) continue;
+            const k = candleAt(base[i].t);
+            tri(X(base[i].t), cy(0) + (up ? 11 : -11), up, false, 5.5, gd, r.col);
+            tri(X(k.m + tf / 2), up ? Y(k.l) + 12 : Y(k.h) - 12, up, false, 5.5, g, r.col);
+          }
+        });
+        // hollow thick triangles: the 1st active SMA crosses the 2nd (e.g. SMA 10 crosses SMA 50)
+        G.xovers = [];
+        if (DS.xover !== false && active.length >= 2) {
+          const A1 = active[0].vals, A2 = active[1].vals;
+          for (let i = 1; i < base.length; i++) {
+            if ([A1[i - 1], A1[i], A2[i - 1], A2[i]].some(v => v === null)) continue;
+            const up = A1[i - 1] <= A2[i - 1] && A1[i] > A2[i], dn = A1[i - 1] >= A2[i - 1] && A1[i] < A2[i];
+            if (!up && !dn) continue;
+            G.xovers.push({t: base[i].t, up, v: A1[i]});
+            if (!showTri || base[i].t < view.x0 || base[i].t > view.x1) continue;
+            const k = candleAt(base[i].t);
+            const xt = (x, y, parent) => {
+              const z = 7, d = up ? `M${x},${y - z}L${x + z},${y + z * 0.8}L${x - z},${y + z * 0.8}Z` : `M${x},${y + z}L${x + z},${y - z * 0.8}L${x - z},${y - z * 0.8}Z`;
+              el("path", {d, fill: "none", stroke: up ? "#22c55e" : "#ef4444", "stroke-width": 2.6, "pointer-events": "none"}, parent);
+            };
+            xt(X(base[i].t), cy(A1[i]) + (up ? 14 : -14), gd);
+            xt(X(k.m + tf / 2), up ? Y(k.l) + 26 : Y(k.h) - 26, g);           // a bit further from the candle than the cd-zero ones
+          }
+        }
+        // filled triangles: cd itself crosses 0 (at candle closes)
+        G.crosses = [];
+        for (let i = 1; i < cs.length; i++) {
+          if (CH.sessions.some(se => se.m > cs[i - 1].m && se.m <= cs[i].m)) continue;   // no cross across the 18:00 reset
+          const a = cumC[i - 1], b = cumC[i];
+          if (a <= 0 && b > 0) G.crosses.push({i, kind: "zero", up: true});
+          else if (a >= 0 && b < 0) G.crosses.push({i, kind: "zero", up: false});
+        }
+        if (showTri) for (const c of G.crosses) {
+          const k = cs[c.i]; if (k.m + tf < view.x0 || k.m > view.x1) continue;
+          tri(X(k.m + tf), cy(cumC[c.i]) + (c.up ? 11 : -11), c.up, true, 7, gd);
+          tri(X(k.m + tf / 2), c.up ? Y(k.l) + 12 : Y(k.h) - 12, c.up, true, 7, g);
+        }
+        legend.push(["   ▲▼ filled = cd crosses 0", "#cbd5e1"]);
+        if (DS.xover !== false && active.length >= 2)
+          legend.push([` · △▽ thick hollow = SMA ${Math.round(active[0].r.p)} crosses SMA ${Math.round(active[1].r.p)}`, "#cbd5e1"]);
+        if (DS.rows.some(r => r.on && r.tri)) legend.push([" · △▽ thin hollow (SMA colour) = that SMA crosses 0", "#cbd5e1"]);
+        const lg = el("text", {x: G.left + 4, y: G.dTop + 27, "font-size": 11, "font-weight": 600, "pointer-events": "none"});
+        for (const [txt, col] of legend) { const t = document.createElementNS(NS, "tspan"); t.setAttribute("fill", col); t.textContent = txt; lg.appendChild(t); }
+        el("text", {x: G.left + 4, y: G.dTop + 41, fill: "#8b919c", "font-size": 10, "pointer-events": "none"}).textContent =
+          minutes ? "SMA periods = minutes (fixed, any zoom)" : `SMA periods = candles (now ${tf}-min)`;
+      }
+      el("polyline", {points: real.map(p => X(p[0]).toFixed(1) + "," + cy(p[1]).toFixed(1)).join(" "), fill: "none", stroke: "#f8fafc", "stroke-width": 2.6}, gd);
+      if (document.getElementById("showBP").checked && document.getElementById("showExtras").checked)
+        el("polyline", {points: bpc.map(p => X(p[0]).toFixed(1) + "," + cy(p[1]).toFixed(1)).join(" "), fill: "none", stroke: "#fbbf24",
+                        "stroke-width": 1.5, "stroke-dasharray": "6 3", opacity: document.getElementById("opacity").value / 100}, gd);
+    }
+  }
+  // VWAP (restarts each session) & SMA100
+  for (const [key, col, dash] of [["vw", "#c084fc", ""], ["sma", "#38bdf8", "5 4"]]) {
+    let d = "", prevM = null;
+    for (let i = 0; i < CH.m.length; i++) {
+      if (CH.m[i] < view.x0 - 5 || CH.m[i] > view.x1 + 5 || CH[key][i] === null) { prevM = null; continue; }
+      const gapBreak = prevM === null || CH.m[i] - prevM > 30 || (key === "vw" && CH.sessions.some(s => s.m > prevM && s.m <= CH.m[i]));
+      d += (gapBreak ? "M" : "L") + X(CH.m[i] + 0.5).toFixed(1) + "," + Y(CH[key][i]).toFixed(1);
+      prevM = CH.m[i];
+    }
+    el("path", {d, fill: "none", stroke: col, "stroke-width": 1.4, "stroke-dasharray": dash}, g);
+  }
+
+  // ---- BP overlay
+  if (document.getElementById("showBP").checked) {
+    const ov = el("g", {opacity: document.getElementById("opacity").value / 100, "clip-path": "url(#plotClip)"});
+    const H0 = home();
+    const edited = verts.some((v, k) => Math.abs(v.t - H0[k].t) > 1e-6 || Math.abs(v.p - H0[k].p) > 1e-6);
+    if (edited && document.getElementById("showGhost").checked)
+      el("polyline", {points: H0.map(v => X(v.t) + "," + Y(v.p)).join(" "), fill: "none", stroke: "#cbd5e1", "stroke-width": 1.2, "stroke-dasharray": "3 4", opacity: 0.6}, ov);
+    // the BP's own VWAP / SMA100 (follow every move and stretch of the BP) and its panels
+    if (PN && document.getElementById("showExtras").checked) {
+      const line = (arr, fy) => arr.map((y, i) => y === null ? null : X(panelT(i)).toFixed(1) + "," + fy(y).toFixed(1)).filter(Boolean).join(" ");
+      el("polyline", {points: line(PN.vwap, y => Y(panelP(y))), fill: "none", stroke: "#f5d0fe", "stroke-width": 1.3, "stroke-dasharray": "6 3"}, ov);
+      el("polyline", {points: line(PN.sma100, y => Y(panelP(y))), fill: "none", stroke: "#bae6fd", "stroke-width": 1.1, "stroke-dasharray": "2 3"}, ov);
+      const op = document.getElementById("opacity").value / 100;
+      if (!PN.cum_delta)   // on cum-delta pages the BP's delta is shown by its dashed cumulative line instead (same unit: contracts)
+        el("polyline", {points: line(PN.delta_ratio, d => G.dTop + G.dH / 2 - Math.max(-1, Math.min(1, d / 0.5)) * (G.dH / 2)), fill: "none", stroke: "#fbbf24", "stroke-width": 1.1, opacity: op}, gd);
+      const vmaxBP = Math.max(...PN.rel_volume, 1e-9);
+      el("polyline", {points: line(PN.rel_volume, v => G.volTop + G.volH - v / vmaxBP * (G.volH - 4)), fill: "none", stroke: "#fbbf24", "stroke-width": 1.1, opacity: op}, gv);
+      const mmax = Math.max(...PN.mid_cross, 1);
+      if (G.mH >= 1) el("polyline", {points: line(PN.mid_cross, v => G.mTop + G.mH - v / mmax * (G.mH - 4)), fill: "none", stroke: "#fbbf24", "stroke-width": 1.1, opacity: op}, gm);
+    }
+    for (let k = 0; k < verts.length - 1; k++) {
+      const a = verts[k], b = verts[k + 1];
+      if (Math.max(a.t, b.t) < view.x0 - 5 || Math.min(a.t, b.t) > view.x1 + 5) continue;
+      const leg = BP.legs[k], bad = flipped(k);
+      const col = bad ? "#f59e0b" : (leg.dir === "UP" ? "#22c55e" : "#f43f5e");
+      el("line", {x1: X(a.t), y1: Y(a.p), x2: X(b.t), y2: Y(b.p), stroke: col, "stroke-width": selLeg === k ? 5 : 3.2, "stroke-linecap": "round", "stroke-dasharray": bad ? "6 4" : ""}, ov);
+      const hit = el("line", {x1: X(a.t), y1: Y(a.p), x2: X(b.t), y2: Y(b.p), stroke: "transparent", "stroke-width": 12, "data-leg": k}, ov);
+      hit.style.cursor = "move";
+      if (document.getElementById("showMid").checked) {
+        const mx = X((a.t + b.t) / 2), my = Y((a.p + b.p) / 2);
+        el("path", {d: `M${mx - 4},${my}L${mx},${my - 4}L${mx + 4},${my}L${mx},${my + 4}Z`, fill: "#0f1115", stroke: col, "stroke-width": 1.4, "pointer-events": "none"}, ov);
+      }
+    }
+    if (hoverVertex !== null) {
+      const k = hoverVertex, a = allowance(k), h = H0[k];
+      el("rect", {x: X(h.t - a.dt), y: Y(h.p + a.dp), width: X(h.t + a.dt) - X(h.t - a.dt), height: Y(h.p - a.dp) - Y(h.p + a.dp),
+                  fill: "#60a5fa", "fill-opacity": 0.08, stroke: "#60a5fa", "stroke-dasharray": "4 3", "pointer-events": "none"}, ov);
+    }
+    verts.forEach((v, k) => {
+      if (v.t < view.x0 - 2 || v.t > view.x1 + 2) return;
+      const c = el("circle", {cx: X(v.t), cy: Y(v.p), r: hoverVertex === k ? 7 : 5, fill: outside(k) ? "#f59e0b" : "#f8fafc", stroke: "#0f1115", "stroke-width": 1.5, "data-vertex": k}, ov);
+      c.style.cursor = "grab";
+    });
+  }
+  if (drag && drag.type === "bpscale" && drag.axis && mouse)
+    el("text", {x: mouse.x + 14, y: mouse.y - 10, fill: "#f8fafc", "font-size": 13, "font-weight": 700, "pointer-events": "none"}).textContent =
+      drag.axis === "t" ? `time ×${A.at.toFixed(2)}` : `price ×${A.ap.toFixed(2)}`;
+  drawCrosshair();
+  updateStatus();
+}
+
+// ---- crosshair (lines + price label + date/time label)
+function drawCrosshair() {
+  const old = document.getElementById("xh"); if (old) old.remove();
+  if (!mouse || !inPlot(mouse.x, mouse.y) || (drag && drag.type === "pan")) return;
+  const g = el("g", {id: "xh", "pointer-events": "none"});
+  const x = mouse.x, y = mouse.y;
+  el("line", {x1: x, x2: x, y1: G.top, y2: G.axisTop, stroke: "#9ca3af", "stroke-dasharray": "3 3", "stroke-width": 0.8}, g);
+  const m = invX(x);
+  const tl = dayOf(m) + " " + clockOf(m);
+  el("rect", {x: x - 52, y: G.axisTop + 2, width: 104, height: 18, rx: 3, fill: "#e5e7eb"}, g);
+  el("text", {x, y: G.axisTop + 15, "text-anchor": "middle", fill: "#0f1115", "font-size": 11, "font-weight": 600}, g).textContent = tl;
+  if (inPrice(x, y)) {
+    el("line", {x1: G.left, x2: G.left + G.plotW, y1: y, y2: y, stroke: "#9ca3af", "stroke-dasharray": "3 3", "stroke-width": 0.8}, g);
+    el("rect", {x: G.left + G.plotW + 1, y: y - 9, width: G.right - 2, height: 18, rx: 3, fill: "#e5e7eb"}, g);
+    el("text", {x: G.left + G.plotW + 6, y: y + 4, fill: "#0f1115", "font-size": 11, "font-weight": 600}, g).textContent = invY(y).toFixed(2);
+  }
+  // inside the delta panel: horizontal line + the delta at the mouse on both axes (contracts)
+  if (PN && PN.cum_delta && G.cumSpan && y >= G.dTop && y <= G.dTop + G.dH && x >= G.left && x <= G.left + G.plotW) {
+    const frac = (G.dTop + G.dH / 2 - y) / (G.dH / 2);
+    const fmt0 = v => (v > 0 ? "+" : "") + Math.round(v).toLocaleString();
+    el("line", {x1: G.left, x2: G.left + G.plotW, y1: y, y2: y, stroke: "#9ca3af", "stroke-dasharray": "3 3", "stroke-width": 0.8}, g);
+    el("rect", {x: G.left + G.plotW + 1, y: y - 9, width: G.right - 2, height: 18, rx: 3, fill: "#f8fafc"}, g);
+    el("text", {x: G.left + G.plotW + 5, y: y + 4, fill: "#0f1115", "font-size": 10, "font-weight": 700}, g).textContent = fmt0(frac * G.cumSpan);
+    el("rect", {x: 1, y: y - 9, width: G.left - 3, height: 18, rx: 3, fill: "#86efac"}, g);
+    el("text", {x: G.left - 5, y: y + 4, fill: "#0f1115", "font-size": 10, "font-weight": 700, "text-anchor": "end"}, g).textContent = fmt0(frac * G.barSpan);
+  }
+}
+
+function updateStatus() {
+  const H0 = home();
+  const moved = verts.filter((v, k) => Math.abs(v.t - H0[k].t) > 1e-6 || Math.abs(v.p - H0[k].p) > 1e-6).length;
+  const outs = verts.filter((v, k) => outside(k)).length, flips = BP.legs.filter((l, k) => flipped(k)).length;
+  const dT = H0[0].t - ORIG[0].t, dP = H0[0].p - ORIG[0].p;
+  const sh = Math.round(dT), hh = Math.trunc(Math.abs(sh) / 60), mm = Math.abs(sh) % 60;
+  const same = Math.abs(dT) < 1e-6 && Math.abs(dP) < 1e-6 && Math.abs(A.at - 1) < 1e-9 && Math.abs(A.ap - 1) < 1e-9;
+  const shTxt = same ? "BP on its own day" :
+    `BP start moved ${sh < 0 ? "−" : "+"}${hh}h ${String(mm).padStart(2, "0")}m, ${sgn(dP)}${fmt(dP)} pts (now starts ${dayOf(verts[0].t)} ${clockOf(verts[0].t)})` +
+    ` · time ×${A.at.toFixed(2)} · price ×${A.ap.toFixed(2)}`;
+  document.getElementById("status").innerHTML = `${shTxt} · ${BP.legs.length} legs · ${moved} joint(s) adjusted` +
+    (outs ? ` · <span class="warn">${outs} outside allowance</span>` : "") + (flips ? ` · <span class="warn">${flips} leg(s) flipped</span>` : "") +
+    (yAuto ? "" : " · price scale manual (double-click price axis = auto)");
+}
+
+// ---- side panel
+function showMeta() {
+  document.getElementById("meta").innerHTML = `<table>
+    <tr><td>Built from</td><td>${M.session}</td></tr>
+    <tr><td>Range</td><td>${fmt(M.low)} – ${fmt(M.high)} (${fmt(M.range, 0)} pts)</td></tr>
+    <tr><td>Open / Close</td><td>${fmt(M.open)} / ${fmt(M.close)}</td></tr>
+    <tr><td>Leg rule</td><td>new leg on every ${M.rev_pts}-pt reversal</td></tr>
+    <tr><td>Legs</td><td>${M.n_legs}</td></tr></table>`;
+}
+function showLeg(k) {
+  if (k === null) return;
+  const l = BP.legs[k], a = verts[k], b = verts[k + 1];
+  const nowPts = b.p - a.p, nowMin = b.t - a.t;
+  const ed = Math.abs(nowPts - l.pts) > 0.01 || Math.abs(nowMin - l.minutes) > 0.01;
+  document.getElementById("legNo").textContent = `#${l.n}`;
+  document.getElementById("leg").innerHTML = `<table>
+    <tr><td>Direction</td><td><span class="tag ${l.dir}">${l.dir}</span>${l.open ? " (open)" : ""}</td></tr>
+    <tr><td>Original time</td><td>${l.start} → ${l.end}</td></tr>
+    <tr><td>Now placed at</td><td>${dayOf(a.t)} ${clockOf(a.t)} → ${clockOf(b.t)}</td></tr>
+    <tr><td>Move</td><td>${sgn(l.pts)}${fmt(l.pts)} pts in ${fmt(l.minutes, 1)} min</td></tr>
+    ${ed ? `<tr><td class="warn">After your edit</td><td class="warn">${sgn(nowPts)}${fmt(nowPts)} pts in ${fmt(nowMin, 1)} min</td></tr>` : ""}
+    <tr><td>Speed</td><td>${fmt(l.speed, 1)} pts/min</td></tr>
+    <tr><td>Fib vs previous leg</td><td>${l.fib_ratio === null ? "—" : fmt(l.fib_ratio * 100, 0) + "% " + l.fib_zone}</td></tr>
+    <tr><td>Delta ratio</td><td>${sgn(l.delta_ratio)}${fmt(l.delta_ratio, 3)}</td></tr>
+    <tr><td>Volume</td><td>${l.volume.toLocaleString()} (${fmt(l.rel_rate, 1)}× session pace)</td></tr>
+    <tr><td>Above VWAP</td><td>${l.pct_above_vwap}% · ends ${sgn(l.end_vs_vwap)}${fmt(l.end_vs_vwap, 1)}</td></tr>
+    <tr><td>Above SMA100</td><td>${l.pct_above_sma100}% · ends ${sgn(l.end_vs_sma100)}${fmt(l.end_vs_sma100, 1)}</td></tr>
+    <tr><td>Mid-point</td><td>${fmt(l.mid)}</td></tr>
+    <tr><td>Mid-point crosses</td><td>${l.mid_crosses} (${fmt(l.crosses_per_min, 1)}/min)</td></tr>
+    <tr><td>Deepest pullback</td><td>${l.max_pullback_pct}% of leg</td></tr>
+    <tr><td>Biggest 1-min range</td><td>${l.max_1m_range_pct}% of leg</td></tr>
+    <tr><td>Most 1-min travel</td><td>${l.max_1m_travel_pct}% of leg</td></tr>
+    <tr><td>Efficiency</td><td>${fmt(l.efficiency, 2)} (1 = straight)</td></tr></table>`;
+}
+
+// ---- interaction
+const local = e => { const r = svg.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; };
+// double-click on an axis is detected here: the page redraws between clicks, so the browser's own
+// dblclick never fires (the clicked element is gone by the second click)
+let lastDown = {t: 0, x: 0, y: 0};
+svg.addEventListener("pointerdown", e => {
+  const pt = local(e);
+  const dbl = e.timeStamp - lastDown.t < 400 && Math.abs(pt.x - lastDown.x) < 6 && Math.abs(pt.y - lastDown.y) < 6;
+  lastDown = {t: e.timeStamp, x: pt.x, y: pt.y};
+  if (dbl && onPriceAxis(pt.x, pt.y)) { yAuto = true; drag = null; render(); return; }
+  if (dbl && onTimeAxis(pt.x, pt.y)) { view = {x0: -20, x1: END + 20}; drag = null; render(); return; }
+  const vk = e.target.getAttribute("data-vertex"), lk = e.target.getAttribute("data-leg");
+  if (vk !== null) { drag = {type: "vertex", k: +vk}; hoverVertex = +vk; }
+  else if (lk !== null && dbl) {
+    // double-click on the BP + drag = stretch / squeeze the WHOLE BP around its centre.
+    // Horizontal drag away from the centre widens time, towards it narrows; vertical likewise for price.
+    const ts = verts.map(v => v.t), ps = verts.map(v => v.p);
+    const c = {t: (Math.min(...ts) + Math.max(...ts)) / 2, p: (Math.min(...ps) + Math.max(...ps)) / 2};
+    drag = {type: "bpscale", x: pt.x, y: pt.y, cx: X(c.t), cy: Y(c.p), c, base: verts.map(v => ({...v})), A0: {...A}, axis: null};
+  }
+  else if (lk !== null) drag = {type: "bp", leg: +lk, x: pt.x, y: pt.y, base: verts.map(v => ({...v})), A0: {...A}, moved: false};
+  else if (onPriceAxis(pt.x, pt.y)) { drag = {type: "yscale", y: pt.y, top: yTop, bot: yBot}; yAuto = false; }
+  else if (onTimeAxis(pt.x, pt.y)) drag = {type: "xscale", x: pt.x, x0: view.x0, x1: view.x1};
+  else if (inPlot(pt.x, pt.y)) drag = {type: "pan", x: pt.x, y: pt.y, x0: view.x0, x1: view.x1, top: yTop, bot: yBot};
+  else return;
+  svg.setPointerCapture(e.pointerId);
+});
+svg.addEventListener("pointermove", e => {
+  const pt = local(e); mouse = pt;
+  if (!drag) {
+    const vk = e.target.getAttribute("data-vertex"), lk = e.target.getAttribute("data-leg");
+    const nv = vk !== null ? +vk : null;
+    let changed = nv !== hoverVertex; hoverVertex = nv;
+    if (!pinned && lk !== null && +lk !== selLeg) { selLeg = +lk; showLeg(selLeg); changed = true; }
+    if (changed) render(); else drawCrosshair();
+    return;
+  }
+  if (drag.type === "vertex") {
+    const k = drag.k, lo = k > 0 ? verts[k - 1].t + 0.1 : -1e9, hi = k < verts.length - 1 ? verts[k + 1].t - 0.1 : 1e9;
+    verts[k] = {t: Math.min(hi, Math.max(lo, invX(pt.x))), p: Math.round(invY(pt.y) * 4) / 4};
+    if (selLeg !== null) showLeg(selLeg);
+  } else if (drag.type === "bp") {
+    const dt = invX(pt.x) - invX(drag.x), dp = Math.round((invY(pt.y) - invY(drag.y)) * 4) / 4;
+    if (Math.abs(pt.x - drag.x) + Math.abs(pt.y - drag.y) > 3) drag.moved = true;
+    if (drag.moved) {
+      verts = drag.base.map(v => ({t: v.t + dt, p: v.p + dp}));
+      A = {...drag.A0, bt: drag.A0.bt + dt, bp: drag.A0.bp + dp};
+      if (selLeg !== null) showLeg(selLeg);
+    }
+  } else if (drag.type === "bpscale") {
+    const dx = pt.x - drag.x, dy = pt.y - drag.y;
+    if (!drag.axis && Math.max(Math.abs(dx), Math.abs(dy)) > 6) drag.axis = Math.abs(dx) >= Math.abs(dy) ? "t" : "p";
+    if (drag.axis === "t") {
+      const out = Math.sign((drag.x - drag.cx) * dx) || 1;              // +1 = pulling away from the centre
+      const f = Math.min(5 / drag.A0.at, Math.max(0.2 / drag.A0.at, Math.exp(out * Math.abs(dx) * 0.005)));
+      const c = drag.c.t;
+      verts = drag.base.map(v => ({t: c + (v.t - c) * f, p: v.p}));
+      A = {...drag.A0, at: drag.A0.at * f, bt: c + (drag.A0.bt - c) * f};
+    } else if (drag.axis === "p") {
+      const out = Math.sign((drag.y - drag.cy) * dy) || 1;
+      const f = Math.min(5 / drag.A0.ap, Math.max(0.2 / drag.A0.ap, Math.exp(out * Math.abs(dy) * 0.005)));
+      const c = drag.c.p;
+      verts = drag.base.map(v => ({t: v.t, p: c + (v.p - c) * f}));
+      A = {...drag.A0, ap: drag.A0.ap * f, bp: c + (drag.A0.bp - c) * f};
+    }
+    if (selLeg !== null) showLeg(selLeg);
+  } else if (drag.type === "yscale") {
+    const f = Math.exp((pt.y - drag.y) * 0.006), mid = (drag.top + drag.bot) / 2, half = (drag.top - drag.bot) / 2 * f;
+    yTop = mid + half; yBot = mid - half;
+  } else if (drag.type === "xscale") {
+    const f = Math.exp(-(pt.x - drag.x) * 0.006), mid = (drag.x0 + drag.x1) / 2, half = Math.max(5, (drag.x1 - drag.x0) / 2 * f);
+    view = {x0: mid - half, x1: mid + half};
+  } else if (drag.type === "pan") {
+    const dm = (pt.x - drag.x) / G.plotW * (drag.x1 - drag.x0);
+    view = {x0: drag.x0 - dm, x1: drag.x1 - dm};
+    if (!yAuto) { const dpz = (pt.y - drag.y) / G.plotH * (drag.top - drag.bot); yTop = drag.top + dpz; yBot = drag.bot + dpz; }
+  }
+  render();
+});
+svg.addEventListener("pointerup", () => {
+  if (drag && drag.type === "bp" && !drag.moved) { selLeg = drag.leg; pinned = true; showLeg(selLeg); }
+  drag = null; render();
+});
+svg.addEventListener("pointerleave", () => { mouse = null; drawCrosshair(); });
+svg.addEventListener("wheel", e => {
+  e.preventDefault();
+  const pt = local(e), m = invX(pt.x);
+  const f = e.deltaY > 0 ? 1.2 : 1 / 1.2, span = Math.min(END + 60, Math.max(5, (view.x1 - view.x0) * f));
+  const frac = (m - view.x0) / (view.x1 - view.x0);
+  view = {x0: m - frac * span, x1: m - frac * span + span}; render();
+}, {passive: false});
+
+document.getElementById("opacity").addEventListener("input", e => { document.getElementById("opv").textContent = e.target.value + "%"; render(); });
+for (const id of ["showBP", "showGhost", "showMid", "showExtras", "showDSMA", "showDTri"]) document.getElementById(id).addEventListener("change", render);
+document.getElementById("tf").addEventListener("change", e => { tfSel = e.target.value; render(); });
+document.getElementById("resetJoints").addEventListener("click", () => { verts = home(); if (selLeg !== null) showLeg(selLeg); render(); });
+document.getElementById("resetBP").addEventListener("click", () => { A = {at: 1, bt: 0, ap: 1, bp: 0}; verts = ORIG.map(v => ({...v})); if (selLeg !== null) showLeg(selLeg); render(); });
+document.getElementById("toBP").addEventListener("click", () => { view = {x0: verts[0].t - 30, x1: verts[verts.length - 1].t + 30}; yAuto = true; render(); });
+document.getElementById("fitAll").addEventListener("click", () => { view = {x0: -20, x1: END + 20}; yAuto = true; render(); });
+// ---- cd SMA editor state (per viewer, remembered in this browser)
+const DS_DEFAULT = {unit: "candles", xover: true, rows: [{p: 10, col: "#facc15", on: true, tri: false}, {p: 50, col: "#22c55e", on: true, tri: false}]};
+let DS = JSON.parse(JSON.stringify(DS_DEFAULT));
+try { const saved = JSON.parse(localStorage.getItem("bp_cd_sma_v2")); if (saved && Array.isArray(saved.rows)) DS = saved; } catch (e) {}
+const saveDS = () => { try { localStorage.setItem("bp_cd_sma_v2", JSON.stringify(DS)); } catch (e) {} };
+const PALETTE = ["#facc15", "#22c55e", "#3b82f6", "#f472b6", "#fb923c", "#a78bfa", "#2dd4bf"];
+function buildDS() {
+  if (!(PN && PN.cum_delta)) return;
+  document.getElementById("dsmaBox").style.display = "";
+  document.getElementById("dsUnit").value = DS.unit;
+  document.getElementById("dsXover").checked = DS.xover !== false;
+  const tb = document.getElementById("dsRows"); tb.innerHTML = "";
+  DS.rows.forEach((r, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td><input type="checkbox" ${r.on ? "checked" : ""} title="show this SMA"></td>
+      <td>SMA <input type="number" min="1" max="2000" step="1" value="${r.p}"></td>
+      <td><input type="color" value="${r.col}" title="colour"></td>
+      <td><label class="hint"><input type="checkbox" ${r.tri ? "checked" : ""}> △ at 0</label></td>
+      <td><button title="remove">×</button></td>`;
+    const [on, per, col, tri] = tr.querySelectorAll("input");
+    on.onchange = () => { r.on = on.checked; saveDS(); render(); };
+    per.oninput = () => { const v = Math.round(+per.value); if (v >= 1) { r.p = v; saveDS(); render(); } };
+    col.oninput = () => { r.col = col.value; saveDS(); render(); };
+    tri.onchange = () => { r.tri = tri.checked; saveDS(); render(); };
+    tr.querySelector("button").onclick = () => { DS.rows.splice(i, 1); saveDS(); buildDS(); render(); };
+    tb.appendChild(tr);
+  });
+}
+document.getElementById("dsUnit").onchange = e => { DS.unit = e.target.value; saveDS(); render(); };
+document.getElementById("dsXover").onchange = e => { DS.xover = e.target.checked; saveDS(); render(); };
+document.getElementById("dsAdd").onclick = () => { DS.rows.push({p: 20, col: PALETTE[DS.rows.length % PALETTE.length], on: true, tri: false}); saveDS(); buildDS(); render(); };
+document.getElementById("dsReset").onclick = () => { DS = JSON.parse(JSON.stringify(DS_DEFAULT)); saveDS(); buildDS(); render(); };
+buildDS();
+new ResizeObserver(render).observe(document.getElementById("chartWrap"));
+showMeta(); render();
+</script>
+</body>
+</html>

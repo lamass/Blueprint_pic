@@ -1,0 +1,42 @@
+# Secrets -- never commit these
+.env
+schwab_token.json
+
+# Market data (raw NinjaTrader tick exports, imports, caches) -- far too large for git, lives in Postgres
+NQ *.txt
+*_Tick_Last*.txt
+*ticks*.txt
+*.npz
+*.pkl
+*.parquet
+_cache/
+
+# Large generated data / outputs (rebuild from Postgres with the scripts)
+*_indicators.json
+period_NQ*.json
+*_1min_candles*.json
+*_5min_candles*.json
+*_candles_trimmed.json
+vpin_buckets_*.csv
+gex_refresh_log.txt
+*.log
+*.out
+
+# Blueprint library and generated pages (rebuild: python blueprints/bp_library.py && python blueprints/bp_predict.py)
+blueprints/library/
+blueprints/matches/
+blueprints/preview/
+blueprints/_test_view.html
+
+# Python / Jupyter / editor clutter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.scratch/
+.vscode/
+*.nbi
+*.nbc
+
+# Claude Code local state (keep the shared agent definition)
+.claude/*
+!.claude/agents/

@@ -1,0 +1,473 @@
+[
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 12,
+        "b": 12
+      },
+      {
+        "type": "point",
+        "a": 57,
+        "b": 57
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712228990,
+    "id": "ann_1790712228990"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 94,
+        "b": 94
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712217844,
+    "id": "ann_1790712217844"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 176,
+        "b": 176
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712212070,
+    "id": "ann_1790712212070"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 327,
+        "b": 327
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712202266,
+    "id": "ann_1790712202266"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 602,
+        "b": 602
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712194727,
+    "id": "ann_1790712194727"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 710,
+        "b": 710
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712188686,
+    "id": "ann_1790712188686"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 832,
+        "b": 832
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712173650,
+    "id": "ann_1790712173650"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 966,
+        "b": 966
+      },
+      {
+        "type": "point",
+        "a": 912,
+        "b": 912
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712167360,
+    "id": "ann_1790712167360"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 1304,
+        "b": 1304
+      },
+      {
+        "type": "point",
+        "a": 1206,
+        "b": 1206
+      },
+      {
+        "type": "point",
+        "a": 1104,
+        "b": 1104
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712158732,
+    "id": "ann_1790712158732"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 1483,
+        "b": 1483
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712138346,
+    "id": "ann_1790712138346"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 2017,
+        "b": 2017
+      },
+      {
+        "type": "point",
+        "a": 1921,
+        "b": 1921
+      },
+      {
+        "type": "point",
+        "a": 1778,
+        "b": 1778
+      },
+      {
+        "type": "point",
+        "a": 1723,
+        "b": 1723
+      },
+      {
+        "type": "point",
+        "a": 1664,
+        "b": 1664
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712130181,
+    "id": "ann_1790712130181"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 2193,
+        "b": 2193
+      },
+      {
+        "type": "point",
+        "a": 2222,
+        "b": 2222
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712083332,
+    "id": "ann_1790712083332"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 2296,
+        "b": 2296
+      }
+    ],
+    "transcript": "Down-Hook (indicating upward move)",
+    "summary": "Down-Hook (indicating upward move)",
+    "dialogue": [],
+    "createdAt": 1790712073797,
+    "id": "ann_1790712073798"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 1972,
+        "b": 1972
+      },
+      {
+        "type": "point",
+        "a": 2038,
+        "b": 2038
+      },
+      {
+        "type": "point",
+        "a": 2159,
+        "b": 2159
+      },
+      {
+        "type": "point",
+        "a": 2275,
+        "b": 2275
+      },
+      {
+        "type": "point",
+        "a": 2391,
+        "b": 2391
+      }
+    ],
+    "transcript": "Up-Hook (indicating downward move)",
+    "summary": "Up-Hook (indicating downward move)",
+    "dialogue": [],
+    "createdAt": 1790712040376,
+    "id": "ann_1790712040376"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 1823,
+        "b": 1823
+      },
+      {
+        "type": "point",
+        "a": 1847,
+        "b": 1847
+      },
+      {
+        "type": "point",
+        "a": 1895,
+        "b": 1895
+      }
+    ],
+    "transcript": "Up-Hook (indicating downward move)",
+    "summary": "Up-Hook (indicating downward move)",
+    "dialogue": [],
+    "createdAt": 1790711990276,
+    "id": "ann_1790711990276"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 1505,
+        "b": 1505
+      }
+    ],
+    "transcript": "Up-Hook (indicating downward move)",
+    "summary": "Up-Hook (indicating downward move)",
+    "dialogue": [],
+    "createdAt": 1790711963648,
+    "id": "ann_1790711963648"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 1379,
+        "b": 1379
+      },
+      {
+        "type": "point",
+        "a": 1439,
+        "b": 1439
+      }
+    ],
+    "transcript": "Up-Hook (indicating downward move)",
+    "summary": "Up-Hook (indicating downward move)",
+    "dialogue": [],
+    "createdAt": 1790711958570,
+    "id": "ann_1790711958570"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 1126,
+        "b": 1126
+      },
+      {
+        "type": "point",
+        "a": 1290,
+        "b": 1290
+      }
+    ],
+    "transcript": "Up-Hook (indicating downward move)",
+    "summary": "Up-Hook (indicating downward move)",
+    "dialogue": [],
+    "createdAt": 1790711945903,
+    "id": "ann_1790711945903"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 803,
+        "b": 803
+      },
+      {
+        "type": "point",
+        "a": 869,
+        "b": 869
+      },
+      {
+        "type": "point",
+        "a": 904,
+        "b": 904
+      },
+      {
+        "type": "point",
+        "a": 987,
+        "b": 987
+      },
+      {
+        "type": "point",
+        "a": 994,
+        "b": 994
+      },
+      {
+        "type": "point",
+        "a": 1011,
+        "b": 1011
+      }
+    ],
+    "transcript": "Up-Hook (indicating downward move)",
+    "summary": "Up-Hook (indicating downward move)",
+    "dialogue": [],
+    "createdAt": 1790711929418,
+    "id": "ann_1790711929418"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 627,
+        "b": 627
+      },
+      {
+        "type": "point",
+        "a": 648,
+        "b": 648
+      }
+    ],
+    "transcript": "Up-Hook (indicating downward move)",
+    "summary": "Up-Hook (indicating downward move)",
+    "dialogue": [],
+    "createdAt": 1790711890873,
+    "id": "ann_1790711890873"
+  },
+  {
+    "category": "hook",
+    "subtype": null,
+    "pieces": [
+      {
+        "type": "point",
+        "a": 231,
+        "b": 231
+      },
+      {
+        "type": "point",
+        "a": 301,
+        "b": 301
+      },
+      {
+        "type": "point",
+        "a": 284,
+        "b": 284
+      },
+      {
+        "type": "point",
+        "a": 418,
+        "b": 418
+      },
+      {
+        "type": "point",
+        "a": 484,
+        "b": 484
+      }
+    ],
+    "transcript": "Up-Hook (indicating downward move)",
+    "summary": "Up-Hook (indicating downward move)",
+    "dialogue": [],
+    "createdAt": 1790711867699,
+    "id": "ann_1790711867699"
+  }
+]
