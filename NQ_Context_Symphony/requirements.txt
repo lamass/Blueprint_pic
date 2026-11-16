@@ -1,3 +1,2 @@
-numpy
-pandas
-flask
+numpy>=1.24
+pandas>=2.0
